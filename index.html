@@ -8,69 +8,109 @@
 <meta name="description" content="Teste técnico Protheus SIGACOM em PO UI: vídeo, documentos, patch e fontes.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --fundo: #f5f3ee; --superficie: #ffffff; --tinta: #16222b; --suave: #5c6870; --linha: #e3e0d8;
-  --acento: #0f5c8c; --acento-forte: #0a4468; --ouro: #b08d3c; --sombra: 0 1px 2px rgba(22,34,43,.06), 0 8px 24px rgba(22,34,43,.06);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fundo: #0e151a; --superficie: #151f26; --tinta: #e9eef1; --suave: #9aa7af; --linha: #24323b;
-    --acento: #6bb6e8; --acento-forte: #9ccff2; --ouro: #d4b56a; --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
-  }
+  --fundo: #F6F3EC; --superficie: #FFFFFF; --superficie-2: #EFEBE1; --tinta: #17191C; --tinta-2: #3D444C; --suave: #5F6873;
+  --linha: #DED8C9; --linha-2: #CFC8B8; --acento: #14456E; --acento-forte: #0E3252; --acento-luz: #E3EAF1;
+  --destaque: #A6321F; --destaque-luz: #F3E4E0; --sombra: 0 3px 0 rgba(20,69,110,.14);
+  --ui: "Bricolage Grotesque", "Segoe UI", sans-serif; --serif: "Newsreader", Georgia, serif; --mono: "JetBrains Mono", monospace;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.6 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-.conteudo { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+html { color-scheme: light; scroll-behavior: smooth; }
+body { margin: 0; background: var(--fundo); color: var(--tinta); font: 15px/1.55 var(--ui); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)' opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 220px 220px; opacity: .42; mix-blend-mode: multiply; }
+body > * { position: relative; z-index: 1; }
+::selection { background: var(--acento); color: #fff; }
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.conteudo { width: min(100% - 32px, 1200px); margin: 0 auto; }
 a { color: var(--acento); }
-header { padding: 72px 0 40px; }
-.selo { display: inline-block; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ouro); font-weight: 600; margin-bottom: 18px; }
-h1 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(34px, 5.4vw, 60px); line-height: 1.08; letter-spacing: -.015em; margin: 0 0 20px; max-width: 16ch; }
-.abertura { font-size: 19px; color: var(--suave); max-width: 62ch; margin: 0 0 28px; }
-.fichas { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 32px; }
-.fichas span { border: 1px solid var(--linha); background: var(--superficie); border-radius: 999px; padding: 5px 14px; font-size: 13px; color: var(--suave); }
-.acoes { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.botao, .baixar { appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; border-radius: 10px; padding: 13px 22px; background: var(--acento); color: #fff; transition: background .2s, transform .2s; text-decoration: none; display: inline-flex; gap: 10px; align-items: baseline; }
-@media (prefers-color-scheme: dark) { .botao, .baixar { color: #0b1216; } }
-.botao:hover, .baixar:hover { background: var(--acento-forte); transform: translateY(-1px); }
-.botao.secundario { background: transparent; color: var(--tinta); border: 1px solid var(--linha); }
-.botao small, .baixar small { font-weight: 400; opacity: .8; font-size: 13px; }
-.baixar[disabled] { cursor: progress; opacity: .85; transform: none; }
-.assinatura { color: var(--suave); font-size: 14px; margin-top: 22px; }
-section { padding: 48px 0; }
-h2 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 30px; letter-spacing: -.01em; margin: 0 0 8px; }
-.sub { color: var(--suave); margin: 0 0 28px; }
-.video { background: #000; border-radius: 16px; overflow: hidden; box-shadow: var(--sombra); aspect-ratio: 16 / 9; }
+header { padding: 56px 0 40px; border-bottom: 2px solid var(--tinta); }
+.selo { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--suave); padding-bottom: 11px; margin-bottom: 18px; border-bottom: 1px solid var(--linha); }
+h1 { font-family: var(--ui); font-weight: 800; font-size: clamp(32px, 5vw, 58px); line-height: 1.02; letter-spacing: -.032em; margin: 0 0 18px; max-width: 18ch; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--acento); }
+.abertura { font-family: var(--serif); font-size: clamp(16px, 1.4vw, 18.5px); color: var(--tinta-2); max-width: 60ch; margin: 0 0 24px; }
+.fichas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+.fichas span { border: 1px solid var(--linha-2); background: var(--superficie); padding: 4px 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--tinta-2); }
+.acoes { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+.botao, .baixar { appearance: none; cursor: pointer; font-family: var(--mono); font-size: 12.5px; font-weight: 500; padding: 11px 17px; background: var(--acento); color: #fff; border: 1.5px solid var(--acento); transition: background .16s, color .16s, border-color .16s; text-decoration: none; display: inline-flex; gap: 10px; align-items: baseline; }
+.botao:hover, .baixar:hover { background: var(--acento-forte); border-color: var(--acento-forte); }
+.botao.secundario { background: transparent; color: var(--tinta); border-color: var(--tinta); }
+.botao.secundario:hover { background: var(--tinta); color: var(--fundo); }
+.botao small, .baixar small { font-size: 11px; opacity: .75; }
+.baixar[disabled] { cursor: progress; opacity: .85; }
+.assinatura { font-family: var(--mono); color: var(--tinta-2); font-size: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--linha); }
+.assinatura b { color: var(--acento); font-weight: 700; }
+section { padding: 48px 0; border-bottom: 1px solid var(--linha); }
+h2 { font-family: var(--ui); font-weight: 800; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.03em; margin: 0 0 6px; }
+.sub { font-family: var(--serif); font-size: 16.5px; color: var(--tinta-2); margin: 0 0 26px; }
+.video { position: relative; background: #000; overflow: hidden; border: 1.5px solid var(--tinta); box-shadow: var(--sombra); aspect-ratio: 16 / 9; }
 .video video { width: 100%; height: 100%; display: block; }
-.grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-.cartao { background: var(--superficie); border: 1px solid var(--linha); border-radius: 16px; padding: 28px; box-shadow: var(--sombra); display: flex; flex-direction: column; }
-.cartao-topo { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
-.numero { font-family: Fraunces, Georgia, serif; color: var(--ouro); font-size: 28px; }
-.cartao h3 { margin: 0; font-size: 20px; font-weight: 600; }
-.cartao p { color: var(--suave); margin: 0 0 18px; }
-.arquivos { list-style: none; margin: 0 0 22px; padding: 0; border-top: 1px solid var(--linha); flex: 1; }
-.arquivos li { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--linha); font-size: 14px; }
+.som { position: absolute; top: 16px; right: 16px; appearance: none; cursor: pointer; font-family: var(--mono); font-size: 12.5px; font-weight: 500; padding: 10px 16px; background: var(--destaque); color: #fff; border: 0; box-shadow: 3px 3px 0 rgba(0,0,0,.35); display: inline-flex; gap: 8px; align-items: baseline; transition: transform .16s; }
+.som:hover { transform: translateY(-2px); }
+.som small { font-size: 10.5px; opacity: .8; }
+.som[hidden] { display: none; }
+.grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.cartao { background: var(--superficie); border: 1.5px solid var(--linha-2); border-left: 4px solid var(--acento); padding: 24px 26px; display: flex; flex-direction: column; transition: transform .16s, box-shadow .16s, border-color .16s; }
+.cartao:hover { transform: translateY(-3px); border-color: var(--acento); box-shadow: var(--sombra); }
+.cartao-topo { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.numero { font-family: var(--ui); font-weight: 800; color: var(--acento); font-size: 29px; line-height: 1; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.cartao h3 { margin: 0; font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 500; }
+.cartao p { font-family: var(--serif); font-size: 15.5px; color: var(--tinta-2); margin: 0 0 16px; }
+.arquivos { list-style: none; margin: 0 0 20px; padding: 0; border-top: 1px dotted var(--linha-2); flex: 1; }
+.arquivos li { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px dotted var(--linha-2); font-size: 13.5px; }
 .arquivos .nome { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .arquivos em { color: var(--suave); font-style: normal; }
-.arquivos .peso { color: var(--suave); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.abrir { font-size: 13px; font-weight: 500; text-decoration: none; border: 1px solid var(--linha); border-radius: 6px; padding: 1px 8px; }
+.arquivos .peso { font-family: var(--mono); font-size: 11.5px; color: var(--suave); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.abrir { font-family: var(--mono); font-size: 11px; text-decoration: none; border: 1px solid var(--acento); padding: 1px 7px; }
+.abrir:hover { background: var(--acento); color: #fff; }
 .baixar { align-self: flex-start; }
-.telas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.telas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .telas figure { margin: 0; }
-.telas img { width: 100%; display: block; border-radius: 12px; border: 1px solid var(--linha); box-shadow: var(--sombra); background: #fff; }
-.telas figcaption { font-size: 14px; color: var(--suave); margin-top: 10px; }
-.passos { counter-reset: passo; list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.passos li { background: var(--superficie); border: 1px solid var(--linha); border-radius: 14px; padding: 22px 24px; }
-.passos li::before { counter-increment: passo; content: "Passo " counter(passo); display: block; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ouro); font-weight: 600; margin-bottom: 8px; }
-code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--fundo); border: 1px solid var(--linha); border-radius: 5px; padding: 1px 6px; overflow-wrap: anywhere; }
-footer { border-top: 1px solid var(--linha); margin-top: 32px; padding: 28px 0 48px; color: var(--suave); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.telas img { width: 100%; display: block; border: 1.5px solid var(--linha-2); background: #fff; }
+.telas figcaption { font-family: var(--serif); font-size: 14.5px; color: var(--tinta-2); margin-top: 8px; }
+.passos { counter-reset: passo; list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.passos li { background: var(--superficie); border: 1.5px solid var(--linha-2); padding: 20px 22px; font-family: var(--serif); font-size: 15.5px; color: var(--tinta-2); }
+.passos li::before { counter-increment: passo; content: "Passo 0" counter(passo); display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--destaque); font-weight: 700; margin-bottom: 8px; }
+code { font-family: var(--mono); font-size: 12px; background: var(--acento-luz); color: var(--acento-forte); padding: 1px 5px; overflow-wrap: anywhere; }
+.tour { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; --duracao: 5.5s; }
+.janela { overflow: hidden; border: 1.5px solid var(--tinta); box-shadow: 6px 6px 0 var(--acento-luz); background: var(--superficie); }
+.janela-barra { display: flex; align-items: center; gap: 7px; padding: 9px 14px; border-bottom: 1.5px solid var(--tinta); background: var(--superficie-2); font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-2); }
+.janela-barra i { width: 10px; height: 10px; border: 1.5px solid var(--tinta); }
+.janela-barra i:first-child { background: var(--destaque); border-color: var(--destaque); }
+.janela-barra span { margin-left: 10px; }
+.palco { position: relative; aspect-ratio: 1366 / 854; overflow: hidden; background: #fff; }
+.quadro { position: absolute; inset: 0; margin: 0; opacity: 0; transition: opacity .9s ease; }
+.quadro.ativo { opacity: 1; }
+.quadro img { width: 100%; height: 100%; display: block; object-fit: cover; transform-origin: var(--foco); }
+.quadro.ativo img { animation: aproxima calc(var(--duracao) + 1s) ease-out forwards; }
+@keyframes aproxima { from { transform: scale(1); } to { transform: scale(1.14); } }
+.etapas { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px dotted var(--linha-2); }
+.etapa { appearance: none; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px dotted var(--linha-2); border-left: 4px solid transparent; padding: 10px 12px; cursor: pointer; display: grid; grid-template-columns: 30px 1fr; gap: 2px 8px; transition: background .16s, border-color .16s; }
+.etapa:hover { background: var(--superficie); }
+.etapa.ativa { background: var(--superficie); border-left-color: var(--destaque); }
+.ordem { font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--suave); padding-top: 4px; }
+.etapa.ativa .ordem { color: var(--acento); }
+.rotulo strong { display: block; font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+.rotulo span { display: block; max-height: 0; overflow: hidden; font-family: var(--serif); color: var(--tinta-2); font-size: 14.5px; line-height: 1.45; transition: max-height .4s ease, margin .4s ease; }
+.etapa.ativa .rotulo span { max-height: 80px; margin-top: 3px; }
+.trilho { grid-column: 2; height: 2px; border-radius: 2px; background: var(--linha); overflow: hidden; margin-top: 8px; display: none; }
+.etapa.ativa .trilho { display: block; }
+.enche { display: block; height: 100%; width: 0; background: var(--acento); }
+.etapa.ativa .enche { animation: enche var(--duracao) linear forwards; }
+@keyframes enche { to { width: 100%; } }
+.tour:hover .enche, .tour:hover .quadro img, .tour:focus-within .enche, .tour:focus-within .quadro img { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .quadro { transition: none; }
+  .quadro.ativo img { animation: none; }
+}
+footer { border-top: 2px solid var(--tinta); margin-top: 32px; padding: 22px 0 48px; color: var(--tinta-2); font-family: var(--mono); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 @media (max-width: 860px) {
-  .grade, .telas, .passos { grid-template-columns: 1fr; }
-  header { padding: 48px 0 24px; }
-  .conteudo { padding: 0 16px; }
-  .cartao { padding: 22px; }
+  .grade, .telas, .passos, .tour { grid-template-columns: 1fr; }
+  header { padding: 40px 0 28px; }
+  .cartao { padding: 20px; }
 }
 </style>
 </head>
@@ -78,21 +118,55 @@ footer { border-top: 1px solid var(--linha); margin-top: 32px; padding: 28px 0 4
 <div class="conteudo">
   <header>
     <span class="selo">Teste técnico · TOTVS Protheus</span>
-    <h1>Consulta de Pré-notas Não Classificadas</h1>
+    <h1>Consulta de Pré-notas <em>Não Classificadas</em></h1>
     <p class="abertura">Visão sintética por filial, com indicadores e gráfico de pizza, e visão analítica de cada filial ou de todas, com exportação para Excel. Feita em PO UI, aberta pelo menu do SIGACOM.</p>
     <div class="fichas"><span>Protheus 12.1.2510</span><span>SIGACOM · Compras</span><span>PO UI · Angular</span><span>TLPP orientado a classe</span><span>Sem dicionário a aplicar</span></div>
     <div class="acoes">
       <a class="botao" href="#entrega">Ver a entrega</a>
       <button class="botao secundario baixar-tudo" data-pasta="*">Baixar tudo <small>ZIP · 86,4 MB</small></button>
     </div>
-    <p class="assinatura">Rubens Simi · 31/10/2026</p>
+    <p class="assinatura"><b>Rubens Simi</b> · 31/10/2026</p>
   </header>
 
   <section>
     <h2>Apresentação</h2>
     <p class="sub">Oito minutos e meio, do menu à planilha exportada.</p>
-    <div class="video"><video controls preload="metadata" poster="pagina/sintetica.webp" src="1 - Video/Video de apresentacao - Consulta de Pre-notas Nao Classificadas.mp4"></video></div>
+    <div class="video">
+      <video controls playsinline preload="auto" poster="pagina/sintetica.webp" src="1 - Video/Video de apresentacao - Consulta de Pre-notas Nao Classificadas.mp4"></video>
+      <button class="som" type="button" hidden>Ativar som <small>recomeça do início</small></button>
+    </div>
   </section>
+
+  <section>
+    <h2>Em funcionamento</h2>
+    <p class="sub">As telas da validação, na ordem de uso. Passe o mouse para pausar ou clique numa etapa.</p>
+    <div class="tour">
+      <div class="janela">
+        <div class="janela-barra"><i></i><i></i><i></i><span>Protheus · SIGACOM · Pré-notas não classificadas</span></div>
+        <div class="palco">
+<figure class="quadro ativo" style="--foco: 50% 30%"><img src="pagina/animacao-1.webp" alt="Informe o período"></figure>
+<figure class="quadro" style="--foco: 28% 30%"><img src="pagina/animacao-2.webp" alt="Sintética por filial" loading="lazy"></figure>
+<figure class="quadro" style="--foco: 78% 55%"><img src="pagina/animacao-3.webp" alt="Gráfico em Valor ou Qtde" loading="lazy"></figure>
+<figure class="quadro" style="--foco: 35% 45%"><img src="pagina/animacao-4.webp" alt="Analítica da filial" loading="lazy"></figure>
+<figure class="quadro" style="--foco: 35% 45%"><img src="pagina/animacao-5.webp" alt="Analítica de todas" loading="lazy"></figure>
+<figure class="quadro" style="--foco: 42% 18%"><img src="pagina/animacao-6.webp" alt="Exportar para Excel" loading="lazy"></figure>
+<figure class="quadro" style="--foco: 35% 40%"><img src="pagina/animacao-7.webp" alt="Planilha da sintética" loading="lazy"></figure>
+<figure class="quadro" style="--foco: 30% 35%"><img src="pagina/animacao-8.webp" alt="Planilha da analítica" loading="lazy"></figure>
+        </div>
+      </div>
+      <ol class="etapas">
+<li><button class="etapa ativa"><span class="ordem">01</span><span class="rotulo"><strong>Informe o período</strong><span>A rotina abre pelo menu do SIGACOM e pergunta a data inicial e a final.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+<li><button class="etapa"><span class="ordem">02</span><span class="rotulo"><strong>Sintética por filial</strong><span>Indicadores no topo, quantidade, valor e % do total de cada filial.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+<li><button class="etapa"><span class="ordem">03</span><span class="rotulo"><strong>Gráfico em Valor ou Qtde</strong><span>A pizza mostra a participação de cada filial e troca de medida num clique.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+<li><button class="etapa"><span class="ordem">04</span><span class="rotulo"><strong>Analítica da filial</strong><span>O duplo clique na filial abre as notas, uma por linha.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+<li><button class="etapa"><span class="ordem">05</span><span class="rotulo"><strong>Analítica de todas</strong><span>O duplo clique no total traz as notas de todas as filiais.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+<li><button class="etapa"><span class="ordem">06</span><span class="rotulo"><strong>Exportar para Excel</strong><span>As duas telas exportam o que está na tela.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+<li><button class="etapa"><span class="ordem">07</span><span class="rotulo"><strong>Planilha da sintética</strong><span>Com o gráfico de pizza nativo do Excel.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+<li><button class="etapa"><span class="ordem">08</span><span class="rotulo"><strong>Planilha da analítica</strong><span>As colunas da tela, com o total no fim.</span></span><span class="trilho"><span class="enche"></span></span></button></li>
+      </ol>
+    </div>
+  </section>
+
 
   <section id="entrega">
     <h2>Entrega</h2>
@@ -231,6 +305,35 @@ async function baixa(botao) {
 }
 
 document.querySelectorAll("[data-pasta]").forEach(b => b.addEventListener("click", () => baixa(b)));
+
+const filme = document.querySelector(".video video");
+const som = document.querySelector(".som");
+function toca() {
+  filme.muted = false;
+  filme.play().catch(() => {
+    filme.muted = true;
+    filme.play();
+    ["pointerdown", "keydown"].forEach(e => document.addEventListener(e, toca, { once: true }));
+  });
+}
+som.addEventListener("click", () => { filme.currentTime = 0; toca(); });
+filme.addEventListener("volumechange", () => (som.hidden = !filme.muted));
+toca();
+
+const quadros = document.querySelectorAll(".quadro");
+const etapas = document.querySelectorAll(".etapa");
+let atual = 0;
+function mostra(n) {
+  quadros[atual].classList.remove("ativo");
+  etapas[atual].classList.remove("ativa");
+  atual = (n + quadros.length) % quadros.length;
+  quadros[atual].classList.add("ativo");
+  etapas[atual].classList.add("ativa");
+}
+etapas.forEach((e, n) => {
+  e.addEventListener("click", () => n !== atual && mostra(n));
+  e.querySelector(".enche").addEventListener("animationend", () => mostra(n + 1));
+});
 </script>
 </body>
 </html>
