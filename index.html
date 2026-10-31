@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Rubens Simi">
+<title>Consulta de Pré-notas Não Classificadas</title>
+<meta name="description" content="Teste técnico Protheus SIGACOM em PO UI: vídeo, documentos, patch e fontes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --fundo: #f5f3ee; --superficie: #ffffff; --tinta: #16222b; --suave: #5c6870; --linha: #e3e0d8;
+  --acento: #0f5c8c; --acento-forte: #0a4468; --ouro: #b08d3c; --sombra: 0 1px 2px rgba(22,34,43,.06), 0 8px 24px rgba(22,34,43,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #0e151a; --superficie: #151f26; --tinta: #e9eef1; --suave: #9aa7af; --linha: #24323b;
+    --acento: #6bb6e8; --acento-forte: #9ccff2; --ouro: #d4b56a; --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.6 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.conteudo { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+a { color: var(--acento); }
+header { padding: 72px 0 40px; }
+.selo { display: inline-block; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ouro); font-weight: 600; margin-bottom: 18px; }
+h1 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(34px, 5.4vw, 60px); line-height: 1.08; letter-spacing: -.015em; margin: 0 0 20px; max-width: 16ch; }
+.abertura { font-size: 19px; color: var(--suave); max-width: 62ch; margin: 0 0 28px; }
+.fichas { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 32px; }
+.fichas span { border: 1px solid var(--linha); background: var(--superficie); border-radius: 999px; padding: 5px 14px; font-size: 13px; color: var(--suave); }
+.acoes { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.botao, .baixar { appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; border-radius: 10px; padding: 13px 22px; background: var(--acento); color: #fff; transition: background .2s, transform .2s; text-decoration: none; display: inline-flex; gap: 10px; align-items: baseline; }
+@media (prefers-color-scheme: dark) { .botao, .baixar { color: #0b1216; } }
+.botao:hover, .baixar:hover { background: var(--acento-forte); transform: translateY(-1px); }
+.botao.secundario { background: transparent; color: var(--tinta); border: 1px solid var(--linha); }
+.botao small, .baixar small { font-weight: 400; opacity: .8; font-size: 13px; }
+.baixar[disabled] { cursor: progress; opacity: .85; transform: none; }
+.assinatura { color: var(--suave); font-size: 14px; margin-top: 22px; }
+section { padding: 48px 0; }
+h2 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 30px; letter-spacing: -.01em; margin: 0 0 8px; }
+.sub { color: var(--suave); margin: 0 0 28px; }
+.video { background: #000; border-radius: 16px; overflow: hidden; box-shadow: var(--sombra); aspect-ratio: 16 / 9; }
+.video video { width: 100%; height: 100%; display: block; }
+.grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.cartao { background: var(--superficie); border: 1px solid var(--linha); border-radius: 16px; padding: 28px; box-shadow: var(--sombra); display: flex; flex-direction: column; }
+.cartao-topo { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+.numero { font-family: Fraunces, Georgia, serif; color: var(--ouro); font-size: 28px; }
+.cartao h3 { margin: 0; font-size: 20px; font-weight: 600; }
+.cartao p { color: var(--suave); margin: 0 0 18px; }
+.arquivos { list-style: none; margin: 0 0 22px; padding: 0; border-top: 1px solid var(--linha); flex: 1; }
+.arquivos li { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--linha); font-size: 14px; }
+.arquivos .nome { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.arquivos em { color: var(--suave); font-style: normal; }
+.arquivos .peso { color: var(--suave); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.abrir { font-size: 13px; font-weight: 500; text-decoration: none; border: 1px solid var(--linha); border-radius: 6px; padding: 1px 8px; }
+.baixar { align-self: flex-start; }
+.telas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.telas figure { margin: 0; }
+.telas img { width: 100%; display: block; border-radius: 12px; border: 1px solid var(--linha); box-shadow: var(--sombra); background: #fff; }
+.telas figcaption { font-size: 14px; color: var(--suave); margin-top: 10px; }
+.passos { counter-reset: passo; list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.passos li { background: var(--superficie); border: 1px solid var(--linha); border-radius: 14px; padding: 22px 24px; }
+.passos li::before { counter-increment: passo; content: "Passo " counter(passo); display: block; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ouro); font-weight: 600; margin-bottom: 8px; }
+code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--fundo); border: 1px solid var(--linha); border-radius: 5px; padding: 1px 6px; overflow-wrap: anywhere; }
+footer { border-top: 1px solid var(--linha); margin-top: 32px; padding: 28px 0 48px; color: var(--suave); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+@media (max-width: 860px) {
+  .grade, .telas, .passos { grid-template-columns: 1fr; }
+  header { padding: 48px 0 24px; }
+  .conteudo { padding: 0 16px; }
+  .cartao { padding: 22px; }
+}
+</style>
+</head>
+<body>
+<div class="conteudo">
+  <header>
+    <span class="selo">Teste técnico · TOTVS Protheus</span>
+    <h1>Consulta de Pré-notas Não Classificadas</h1>
+    <p class="abertura">Visão sintética por filial, com indicadores e gráfico de pizza, e visão analítica de cada filial ou de todas, com exportação para Excel. Feita em PO UI, aberta pelo menu do SIGACOM.</p>
+    <div class="fichas"><span>Protheus 12.1.2510</span><span>SIGACOM · Compras</span><span>PO UI · Angular</span><span>TLPP orientado a classe</span><span>Sem dicionário a aplicar</span></div>
+    <div class="acoes">
+      <a class="botao" href="#entrega">Ver a entrega</a>
+      <button class="botao secundario baixar-tudo" data-pasta="*">Baixar tudo <small>ZIP · 86,4 MB</small></button>
+    </div>
+    <p class="assinatura">Rubens Simi · 31/10/2026</p>
+  </header>
+
+  <section>
+    <h2>Apresentação</h2>
+    <p class="sub">Oito minutos e meio, do menu à planilha exportada.</p>
+    <div class="video"><video controls preload="metadata" poster="pagina/sintetica.webp" src="1 - Video/Video de apresentacao - Consulta de Pre-notas Nao Classificadas.mp4"></video></div>
+  </section>
+
+  <section id="entrega">
+    <h2>Entrega</h2>
+    <p class="sub">Cada pasta baixa separada. As pastas com mais de um arquivo descem em ZIP, montado no próprio navegador.</p>
+    <div class="grade">
+      <article class="cartao">
+        <div class="cartao-topo"><span class="numero">01</span><h3>Vídeo de apresentação</h3></div>
+        <p>Apresentação narrada da consulta, do menu à exportação para Excel.</p>
+        <ul class="arquivos">
+<li><span class="nome">Video de apresentacao - Consulta de Pre-notas Nao Classificadas.mp4</span><span class="peso">75,3 MB</span></li>
+        </ul>
+        <button class="baixar" data-pasta="1 - Video">Baixar vídeo <small>MP4 · 75,3 MB</small></button>
+      </article>
+      <article class="cartao">
+        <div class="cartao-topo"><span class="numero">02</span><h3>Documentos</h3></div>
+        <p>Especificação técnica, termo de validação com as telas de cada caso, manual do usuário e GMUD da implantação.</p>
+        <ul class="arquivos">
+<li><span class="nome">GMUD - Consulta de Pre-notas Nao Classificadas.pdf</span> <a class="abrir" href="2 - Documentos/GMUD - Consulta de Pre-notas Nao Classificadas.pdf" target="_blank" rel="noopener">abrir</a><span class="peso">152 KB</span></li>
+<li><span class="nome">MIT010 - Consulta de Pre-notas Nao Classificadas.pdf</span> <a class="abrir" href="2 - Documentos/MIT010 - Consulta de Pre-notas Nao Classificadas.pdf" target="_blank" rel="noopener">abrir</a><span class="peso">3,5 MB</span></li>
+<li><span class="nome">MIT044 - Consulta de Pre-notas Nao Classificadas.pdf</span> <a class="abrir" href="2 - Documentos/MIT044 - Consulta de Pre-notas Nao Classificadas.pdf" target="_blank" rel="noopener">abrir</a><span class="peso">1,4 MB</span></li>
+<li><span class="nome">Manual do Usuario - Consulta de Pre-notas Nao Classificadas.pdf</span> <a class="abrir" href="2 - Documentos/Manual do Usuario - Consulta de Pre-notas Nao Classificadas.pdf" target="_blank" rel="noopener">abrir</a><span class="peso">1,8 MB</span></li>
+        </ul>
+        <button class="baixar" data-pasta="2 - Documentos">Baixar pasta <small>ZIP · 6,9 MB</small></button>
+      </article>
+      <article class="cartao">
+        <div class="cartao-topo"><span class="numero">03</span><h3>Patch</h3></div>
+        <p>Os 7 objetos prontos para aplicar no RPO, com a lista do conteúdo.</p>
+        <ul class="arquivos">
+<li><span class="nome">CAPITANI-PRENOTAS-2026-10-30-conteudo.txt</span><span class="peso">1 KB</span></li>
+<li><span class="nome">CAPITANI-PRENOTAS-2026-10-30.ptm</span><span class="peso">1,9 MB</span></li>
+        </ul>
+        <button class="baixar" data-pasta="3 - Patch">Baixar pasta <small>ZIP · 1,9 MB</small></button>
+      </article>
+      <article class="cartao">
+        <div class="cartao-topo"><span class="numero">04</span><h3>Fontes</h3></div>
+        <p>Seis fontes TLPP orientados a classe, o app PO UI compilado e o fonte Angular do app.</p>
+        <ul class="arquivos">
+<li><span class="nome">COMPACTADORZIP.tlpp</span><span class="peso">7 KB</span></li>
+<li><span class="nome">CONSULTAPRENOTA.tlpp</span><span class="peso">13 KB</span></li>
+<li><span class="nome">PLANILHAANALITICA.tlpp</span><span class="peso">6 KB</span></li>
+<li><span class="nome">PLANILHAPRENOTA.tlpp</span><span class="peso">24 KB</span></li>
+<li><span class="nome">PLANILHASINTETICA.tlpp</span><span class="peso">9 KB</span></li>
+<li><span class="nome">PRENOTAS.tlpp</span><span class="peso">8 KB</span></li>
+<li><span class="nome">prenotas.app</span><span class="peso">1,9 MB</span></li>
+<li><span class="nome">prenotas-app/ <em>(37 arquivos do Angular)</em></span><span class="peso">314 KB</span></li>
+        </ul>
+        <button class="baixar" data-pasta="4 - Fontes">Baixar pasta <small>ZIP · 2,3 MB</small></button>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>Telas</h2>
+    <p class="sub">Capturadas na validação, com 41 pré-notas em 4 filiais.</p>
+    <div class="telas">
+<figure><img src="pagina/sintetica.webp" alt="Tela sintética: indicadores, tabela por filial e gráfico em Valor" loading="lazy"><figcaption>Tela sintética: indicadores, tabela por filial e gráfico em Valor</figcaption></figure>
+<figure><img src="pagina/analitica.webp" alt="Tela analítica da filial, aberta no duplo clique" loading="lazy"><figcaption>Tela analítica da filial, aberta no duplo clique</figcaption></figure>
+<figure><img src="pagina/planilha.webp" alt="Planilha exportada, com o gráfico de pizza nativo do Excel" loading="lazy"><figcaption>Planilha exportada, com o gráfico de pizza nativo do Excel</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Implantação</h2>
+    <p class="sub">Nenhum SX1, SX3, SIX ou parâmetro: só o RPO e o menu.</p>
+    <ol class="passos">
+      <li>Aplicar o patch <code>CAPITANI-PRENOTAS-2026-10-30.ptm</code> no RPO, ou compilar os 6 fontes TLPP e o recurso <code>prenotas.app</code>.</li>
+      <li>Incluir no menu do SIGACOM, em Consultas, a função <code>capitani.compras.prenota.u_prenotas</code>.</li>
+      <li>Abrir a rotina, informar o período e conferir as duas telas e as exportações. Detalhes na seção 10 do MIT044.</li>
+    </ol>
+  </section>
+
+  <footer>
+    <span>Rubens Simi</span>
+    <a href="https://github.com/rubenscsimi/consulta-prenotas-poui-protheus">Repositório no GitHub</a>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const PASTAS = {"1 - Video": ["1 - Video/Video de apresentacao - Consulta de Pre-notas Nao Classificadas.mp4"], "2 - Documentos": ["2 - Documentos/GMUD - Consulta de Pre-notas Nao Classificadas.pdf", "2 - Documentos/MIT010 - Consulta de Pre-notas Nao Classificadas.pdf", "2 - Documentos/MIT044 - Consulta de Pre-notas Nao Classificadas.pdf", "2 - Documentos/Manual do Usuario - Consulta de Pre-notas Nao Classificadas.pdf"], "3 - Patch": ["3 - Patch/CAPITANI-PRENOTAS-2026-10-30-conteudo.txt", "3 - Patch/CAPITANI-PRENOTAS-2026-10-30.ptm"], "4 - Fontes": ["4 - Fontes/COMPACTADORZIP.tlpp", "4 - Fontes/CONSULTAPRENOTA.tlpp", "4 - Fontes/PLANILHAANALITICA.tlpp", "4 - Fontes/PLANILHAPRENOTA.tlpp", "4 - Fontes/PLANILHASINTETICA.tlpp", "4 - Fontes/PRENOTAS.tlpp", "4 - Fontes/prenotas-app/.editorconfig", "4 - Fontes/prenotas-app/.gitignore", "4 - Fontes/prenotas-app/angular.json", "4 - Fontes/prenotas-app/package-lock.json", "4 - Fontes/prenotas-app/package.json", "4 - Fontes/prenotas-app/src/app/analitica/analitica.html", "4 - Fontes/prenotas-app/src/app/analitica/analitica.scss", "4 - Fontes/prenotas-app/src/app/analitica/analitica.ts", "4 - Fontes/prenotas-app/src/app/app.config.ts", "4 - Fontes/prenotas-app/src/app/app.html", "4 - Fontes/prenotas-app/src/app/app.routes.ts", "4 - Fontes/prenotas-app/src/app/app.scss", "4 - Fontes/prenotas-app/src/app/app.ts", "4 - Fontes/prenotas-app/src/app/core/arquivo/arquivo.ts", "4 - Fontes/prenotas-app/src/app/core/canal/canal.ts", "4 - Fontes/prenotas-app/src/app/core/pagina/pagina.ts", "4 - Fontes/prenotas-app/src/app/core/periodo/periodo.service.ts", "4 - Fontes/prenotas-app/src/app/core/periodo/periodo.ts", "4 - Fontes/prenotas-app/src/app/core/prenotas/prenotas.service.ts", "4 - Fontes/prenotas-app/src/app/core/prenotas/prenotas.ts", "4 - Fontes/prenotas-app/src/app/core/prenotas/ultima-sintetica.service.ts", "4 - Fontes/prenotas-app/src/app/sintetica/filtro-periodo/filtro-periodo.html", "4 - Fontes/prenotas-app/src/app/sintetica/filtro-periodo/filtro-periodo.scss", "4 - Fontes/prenotas-app/src/app/sintetica/filtro-periodo/filtro-periodo.ts", "4 - Fontes/prenotas-app/src/app/sintetica/indicador/indicador.html", "4 - Fontes/prenotas-app/src/app/sintetica/indicador/indicador.scss", "4 - Fontes/prenotas-app/src/app/sintetica/indicador/indicador.ts", "4 - Fontes/prenotas-app/src/app/sintetica/sintetica.html", "4 - Fontes/prenotas-app/src/app/sintetica/sintetica.scss", "4 - Fontes/prenotas-app/src/app/sintetica/sintetica.ts", "4 - Fontes/prenotas-app/src/assets/data/appConfig.json", "4 - Fontes/prenotas-app/src/assets/preload/advpltojs.js", "4 - Fontes/prenotas-app/src/index.html", "4 - Fontes/prenotas-app/src/main.ts", "4 - Fontes/prenotas-app/src/styles.scss", "4 - Fontes/prenotas-app/tsconfig.app.json", "4 - Fontes/prenotas-app/tsconfig.json", "4 - Fontes/prenotas.app"]};
+const url = caminho => caminho.split("/").map(encodeURIComponent).join("/");
+
+function salva(blob, nome) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+async function busca(caminho, aoReceber) {
+  const resposta = await fetch(url(caminho));
+  if (!resposta.ok) throw new Error(caminho);
+  const leitor = resposta.body.getReader();
+  const partes = [];
+  for (;;) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    partes.push(value);
+    aoReceber(value.length);
+  }
+  return new Blob(partes);
+}
+
+async function baixa(botao) {
+  const pasta = botao.dataset.pasta;
+  const caminhos = pasta === "*" ? Object.values(PASTAS).flat() : PASTAS[pasta];
+  const original = botao.innerHTML;
+  let recebido = 0;
+  const tamanhos = await Promise.all(caminhos.map(c => fetch(url(c), { method: "HEAD" }).then(r => +r.headers.get("content-length") || 0).catch(() => 0)));
+  const esperado = tamanhos.reduce((a, b) => a + b, 0) || 1;
+  const progresso = n => { recebido += n; botao.innerHTML = `Preparando… <small>${Math.min(99, Math.floor(recebido * 100 / esperado))}%</small>`; };
+  botao.disabled = true;
+  try {
+    if (caminhos.length === 1) {
+      salva(await busca(caminhos[0], progresso), caminhos[0].split("/").pop());
+    } else {
+      const zip = new JSZip();
+      for (const c of caminhos) {
+        const compacta = !/\.(mp4|app|ptm)$/i.test(c);
+        zip.file(c, await busca(c, progresso), { compression: compacta ? "DEFLATE" : "STORE" });
+      }
+      botao.innerHTML = "Compactando…";
+      const nome = pasta === "*" ? "Consulta de Pre-notas Nao Classificadas" : pasta;
+      salva(await zip.generateAsync({ type: "blob" }), nome + ".zip");
+    }
+    botao.innerHTML = original;
+  } catch (erro) {
+    botao.innerHTML = "Não foi possível baixar. Tente de novo.";
+    setTimeout(() => (botao.innerHTML = original), 4000);
+  } finally {
+    botao.disabled = false;
+  }
+}
+
+document.querySelectorAll("[data-pasta]").forEach(b => b.addEventListener("click", () => baixa(b)));
+</script>
+</body>
+</html>
