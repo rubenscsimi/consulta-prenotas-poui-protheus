@@ -10,10 +10,10 @@ Release: TOTVS Protheus 12.1.2510 · Módulo: SIGACOM — Compras · Fontes em T
 
 | Pasta | O que tem |
 |---|---|
-| `1 - Fontes` | 6 fontes TLPP, o app PO UI compilado (`prenotas.app`) e o fonte Angular do app (`prenotas-app`) |
-| `2 - Patch` | patch com os 7 objetos (`.ptm`) e a lista do conteúdo |
-| `3 - Documentos` | MIT044 (especificação técnica), MIT010 (termo de validação com as telas) e manual do usuário |
-| `4 - Video` | vídeo de apresentação narrado (8 min 35 s) |
+| `1 - Video` | vídeo de apresentação narrado (8 min 35 s) |
+| `2 - Documentos` | MIT044 (especificação técnica), MIT010 (termo de validação com as telas) e manual do usuário |
+| `3 - Patch` | patch com os 7 objetos (`.ptm`) e a lista do conteúdo |
+| `4 - Fontes` | 6 fontes TLPP, o app PO UI compilado (`prenotas.app`) e o fonte Angular do app (`prenotas-app`) |
 
 ## Implantação
 
