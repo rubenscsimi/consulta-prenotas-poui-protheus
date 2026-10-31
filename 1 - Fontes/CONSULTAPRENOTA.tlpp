@@ -1,0 +1,345 @@
+#include "tlpp-core.th"
+
+namespace capitani.compras.prenota
+
+//CONSULTAPRENOTA - consulta das pre-notas nao classificadas (sintetica e analitica); usada por PRENOTAS
+
+/*/{Protheus.doc} ConsultaPrenota
+Consulta, por periodo de digitacao, as pre-notas nao classificadas das filiais a que o usuario tem acesso.
+@type class
+@author Rubens Simi
+@since 30/10/2026
+/*/
+class ConsultaPrenota
+
+    private data dDataInicial as date
+    private data dDataFinal   as date
+    private data cCodFilial   as character
+    private data aFiliais     as array
+    private data lValido      as logical
+    private data jErro        as json
+
+    public  method new(cDataInicial as character, cDataFinal as character, cCodFilial as character)
+    public  method valido() as logical
+    public  method erro() as json
+    public  method sintetico() as json
+    public  method analitico() as json
+    public  method nomeFilial(cCodFilial as character) as character
+
+    private method validar(cDataInicial as character, cDataFinal as character)
+    private method recusar(cMensagem as character, cDetalhe as character)
+    private method paraData(cIso as character) as date
+    private method filiaisDoUsuario() as array
+    private method filtroPrenota() as character
+    private method abrir(cQuery as character) as character
+    private method itemSintetico(cAlias as character) as json
+    private method itemAnalitico(cAlias as character) as json
+
+endclass
+
+/*/{Protheus.doc} ConsultaPrenota::new
+Valida o periodo e a filial informados e guarda as filiais permitidas ao usuario.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cDataInicial, character, data inicial de digitacao (AAAA-MM-DD)
+@param cDataFinal, character, data final de digitacao (AAAA-MM-DD)
+@param cCodFilial, character, filial da analitica; vazio considera todas as permitidas
+@return object, a propria consulta
+/*/
+method new(cDataInicial as character, cDataFinal as character, cCodFilial as character) class ConsultaPrenota
+
+    self:cCodFilial := AllTrim(cCodFilial)
+    self:aFiliais   := self:filiaisDoUsuario()
+    self:lValido    := .T.
+    self:validar(cDataInicial, cDataFinal)
+
+return self
+
+/*/{Protheus.doc} ConsultaPrenota::valido
+Informa se os parametros da consulta foram aceitos.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return logical, .T. quando a consulta pode ser executada
+/*/
+method valido() as logical class ConsultaPrenota
+return self:lValido
+
+/*/{Protheus.doc} ConsultaPrenota::erro
+Devolve o erro de parametro no modelo de erro TOTVS.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return json, objeto com code, message e detailedMessage
+/*/
+method erro() as json class ConsultaPrenota
+return self:jErro
+
+/*/{Protheus.doc} ConsultaPrenota::sintetico
+Quantidade de documentos e valor (F1_VALBRUT) por filial, com o total geral, em uma unica query.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return json, objeto com items (por filial) e total
+/*/
+method sintetico() as json class ConsultaPrenota
+
+    Local jResposta := JsonObject():new()
+    Local jTotal    := JsonObject():new()
+    Local aItems    := {}
+    Local cQuery    := ""
+    Local cAlias    := ""
+
+    cQuery := " SELECT DOC.FILIAL, COUNT(*) QUANTIDADE, COALESCE(SUM(DOC.VALOR), 0) VALOR, GROUPING(DOC.FILIAL) TOTALGERAL"
+    cQuery += "   FROM (SELECT SF1.F1_FILIAL FILIAL, SUM(SF1.F1_VALBRUT) VALOR"
+    cQuery += "           FROM " + RetSqlName("SF1") + " SF1"
+    cQuery += "          WHERE " + self:filtroPrenota()
+    cQuery += "          GROUP BY SF1.F1_FILIAL, SF1.F1_FORNECE, SF1.F1_LOJA, SF1.F1_DOC, SF1.F1_SERIE) DOC"
+    cQuery += "  GROUP BY ROLLUP(DOC.FILIAL)"
+    cQuery += "  ORDER BY GROUPING(DOC.FILIAL), DOC.FILIAL"
+
+    jTotal["quantidade"] := 0
+    jTotal["valor"]      := 0
+
+    cAlias := self:abrir(cQuery)
+    While !(cAlias)->(Eof())
+        If (cAlias)->TOTALGERAL == 1
+            jTotal["quantidade"] := Int((cAlias)->QUANTIDADE)
+            jTotal["valor"]      := Round((cAlias)->VALOR, 2)
+        Else
+            aAdd(aItems, self:itemSintetico(cAlias))
+        EndIf
+        (cAlias)->(DbSkip())
+    EndDo
+    (cAlias)->(DbCloseArea())
+
+    jResposta["items"] := aItems
+    jResposta["total"] := jTotal
+
+return jResposta
+
+/*/{Protheus.doc} ConsultaPrenota::analitico
+Pre-notas do periodo ordenadas por filial, fornecedor, documento e serie, com o total, em uma unica query.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return json, objeto com items (um por documento) e total
+/*/
+method analitico() as json class ConsultaPrenota
+
+    Local jResposta := JsonObject():new()
+    Local jTotal    := JsonObject():new()
+    Local aItems    := {}
+    Local cQuery    := ""
+    Local cAlias    := ""
+
+    cQuery := " SELECT SF1.F1_FILIAL FILIAL, SF1.F1_FORNECE FORNECEDOR, SF1.F1_LOJA LOJA, SA2.A2_NOME RAZAOSOCIAL,"
+    cQuery += "        SF1.F1_DOC DOCUMENTO, SF1.F1_SERIE SERIE, SF1.F1_DTDIGIT DTDIGIT, SF1.F1_EMISSAO DTEMISSAO,"
+    cQuery += "        SF1.F1_VALBRUT VALORDOCUMENTO,"
+    cQuery += "        (SELECT SUM(SD1.D1_TOTAL)"
+    cQuery += "           FROM " + RetSqlName("SD1") + " SD1"
+    cQuery += "          WHERE " + FWJoinFilial("SD1", "SF1")
+    cQuery += "            AND SD1.D1_DOC = SF1.F1_DOC AND SD1.D1_SERIE = SF1.F1_SERIE"
+    cQuery += "            AND SD1.D1_FORNECE = SF1.F1_FORNECE AND SD1.D1_LOJA = SF1.F1_LOJA"
+    cQuery += "            AND SD1.D_E_L_E_T_ = ' ') VALORITENS,"
+    cQuery += "        COUNT(*) OVER () TOTALQUANTIDADE, SUM(SF1.F1_VALBRUT) OVER () TOTALVALOR"
+    cQuery += "   FROM " + RetSqlName("SF1") + " SF1"
+    cQuery += "   LEFT JOIN " + RetSqlName("SA2") + " SA2"
+    cQuery += "     ON " + FWJoinFilial("SA2", "SF1")
+    cQuery += "    AND SA2.A2_COD = SF1.F1_FORNECE AND SA2.A2_LOJA = SF1.F1_LOJA AND SA2.D_E_L_E_T_ = ' '"
+    cQuery += "  WHERE " + self:filtroPrenota()
+    cQuery += "  ORDER BY SF1.F1_FILIAL, SF1.F1_FORNECE, SF1.F1_DOC, SF1.F1_SERIE"
+
+    jTotal["quantidade"] := 0
+    jTotal["valor"]      := 0
+
+    cAlias := self:abrir(cQuery)
+    If !(cAlias)->(Eof())
+        jTotal["quantidade"] := Int((cAlias)->TOTALQUANTIDADE)
+        jTotal["valor"]      := Round((cAlias)->TOTALVALOR, 2)
+    EndIf
+    While !(cAlias)->(Eof())
+        aAdd(aItems, self:itemAnalitico(cAlias))
+        (cAlias)->(DbSkip())
+    EndDo
+    (cAlias)->(DbCloseArea())
+
+    jResposta["items"] := aItems
+    jResposta["total"] := jTotal
+
+return jResposta
+
+/*/{Protheus.doc} ConsultaPrenota::validar
+Confere periodo e filial; o primeiro problema encontrado vira o erro da consulta.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cDataInicial, character, data inicial recebida
+@param cDataFinal, character, data final recebida
+/*/
+method validar(cDataInicial as character, cDataFinal as character) class ConsultaPrenota
+
+    self:dDataInicial := self:paraData(cDataInicial)
+    self:dDataFinal   := self:paraData(cDataFinal)
+
+    If Empty(cDataInicial)
+        self:recusar("Data inicial obrigatória.", "Informe a data inicial.")
+    ElseIf Empty(cDataFinal)
+        self:recusar("Data final obrigatória.", "Informe a data final.")
+    ElseIf Empty(self:dDataInicial)
+        self:recusar("Data inicial inválida.", "Informe uma data inicial existente.")
+    ElseIf Empty(self:dDataFinal)
+        self:recusar("Data final inválida.", "Informe uma data final existente.")
+    ElseIf self:dDataInicial > self:dDataFinal
+        self:recusar("Período inválido.", "A data inicial não pode ser maior que a data final.")
+    ElseIf !Empty(self:cCodFilial) .And. aScan(self:aFiliais, {|cFil| cFil == self:cCodFilial}) == 0
+        self:recusar("Filial inválida.", "A filial " + self:cCodFilial + " não existe na empresa ou o usuário não tem acesso.")
+    EndIf
+
+return
+
+/*/{Protheus.doc} ConsultaPrenota::recusar
+Marca a consulta como invalida e monta o erro no modelo TOTVS.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cMensagem, character, mensagem do erro
+@param cDetalhe, character, detalhe do erro
+/*/
+method recusar(cMensagem as character, cDetalhe as character) class ConsultaPrenota
+
+    self:lValido := .F.
+    self:jErro   := JsonObject():new()
+    self:jErro["code"]            := "400"
+    self:jErro["message"]         := cMensagem
+    self:jErro["detailedMessage"] := cDetalhe
+
+return
+
+/*/{Protheus.doc} ConsultaPrenota::paraData
+Converte AAAA-MM-DD em data; devolve data vazia quando o texto nao e uma data existente nesse formato.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cIso, character, texto da data
+@return date, data convertida ou vazia
+/*/
+method paraData(cIso as character) as date class ConsultaPrenota
+
+    Local cDigitos := StrTran(cIso, "-", "")
+    Local dData    := StoD(cDigitos)
+
+    If Len(cIso) != 10 .Or. SubStr(cIso, 5, 1) != "-" .Or. SubStr(cIso, 8, 1) != "-" .Or. DToS(dData) != cDigitos
+        dData := CToD("")
+    EndIf
+
+return dData
+
+/*/{Protheus.doc} ConsultaPrenota::filiaisDoUsuario
+Filiais da empresa logada a que o usuario tem acesso.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return array, codigos de filial
+/*/
+method filiaisDoUsuario() as array class ConsultaPrenota
+
+    Local aSM0     := FWLoadSM0(.T.)
+    Local aFiliais := {}
+    Local nFilial  := 0
+
+    For nFilial := 1 To Len(aSM0)
+        If aSM0[nFilial][1] == cEmpAnt .And. aSM0[nFilial][11]
+            aAdd(aFiliais, AllTrim(aSM0[nFilial][2]))
+        EndIf
+    Next nFilial
+
+return aFiliais
+
+/*/{Protheus.doc} ConsultaPrenota::nomeFilial
+Nome da filial no cadastro de empresas.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cCodFilial, character, codigo da filial
+@return character, M0_FILIAL sem espacos nas pontas
+/*/
+method nomeFilial(cCodFilial as character) as character class ConsultaPrenota
+return AllTrim(FWSM0Util():GetSM0Data(cEmpAnt, cCodFilial, {"M0_FILIAL"})[1][2])
+
+/*/{Protheus.doc} ConsultaPrenota::filtroPrenota
+Condicao comum das duas visoes: filiais, nao excluida, nao classificada e periodo de digitacao (3 binds).
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, trecho SQL do WHERE
+/*/
+method filtroPrenota() as character class ConsultaPrenota
+return " SF1.F1_FILIAL IN (?) AND SF1.D_E_L_E_T_ = ' ' AND SF1.F1_STATUS = ' ' AND SF1.F1_DTDIGIT BETWEEN ? AND ? "
+
+/*/{Protheus.doc} ConsultaPrenota::abrir
+Executa a query com os binds de filtroPrenota e devolve o alias aberto.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cQuery, character, query com o WHERE de filtroPrenota
+@return character, alias da consulta
+/*/
+method abrir(cQuery as character) as character class ConsultaPrenota
+
+    Local oStatement := FWExecStatement():new(ChangeQuery(cQuery))
+    Local cAlias     := ""
+
+    oStatement:setIn(1, If(Empty(self:cCodFilial), self:aFiliais, {self:cCodFilial}))
+    oStatement:setString(2, DToS(self:dDataInicial))
+    oStatement:setString(3, DToS(self:dDataFinal))
+
+    cAlias := oStatement:openAlias()
+    oStatement:destroy()
+
+return cAlias
+
+/*/{Protheus.doc} ConsultaPrenota::itemSintetico
+Linha da sintetica a partir do registro posicionado.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cAlias, character, alias da query sintetica
+@return json, filial, nomeFilial, quantidade e valor
+/*/
+method itemSintetico(cAlias as character) as json class ConsultaPrenota
+
+    Local jItem := JsonObject():new()
+
+    jItem["filial"]     := AllTrim((cAlias)->FILIAL)
+    jItem["nomeFilial"] := self:nomeFilial(jItem["filial"])
+    jItem["quantidade"] := Int((cAlias)->QUANTIDADE)
+    jItem["valor"]      := Round((cAlias)->VALOR, 2)
+
+return jItem
+
+/*/{Protheus.doc} ConsultaPrenota::itemAnalitico
+Linha da analitica a partir do registro posicionado.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cAlias, character, alias da query analitica
+@return json, as dez colunas do contrato
+/*/
+method itemAnalitico(cAlias as character) as json class ConsultaPrenota
+
+    Local jItem := JsonObject():new()
+
+    jItem["filial"]         := AllTrim((cAlias)->FILIAL)
+    jItem["fornecedor"]     := AllTrim((cAlias)->FORNECEDOR)
+    jItem["loja"]           := AllTrim((cAlias)->LOJA)
+    jItem["razaoSocial"]    := AllTrim((cAlias)->RAZAOSOCIAL)
+    jItem["documento"]      := AllTrim((cAlias)->DOCUMENTO)
+    jItem["serie"]          := AllTrim((cAlias)->SERIE)
+    jItem["dataDigitacao"]  := Transform((cAlias)->DTDIGIT, "@R 9999-99-99")
+    jItem["dataEmissao"]    := Transform((cAlias)->DTEMISSAO, "@R 9999-99-99")
+    jItem["valorDocumento"] := Round((cAlias)->VALORDOCUMENTO, 2)
+    jItem["valorItens"]     := Round((cAlias)->VALORITENS, 2)
+
+return jItem

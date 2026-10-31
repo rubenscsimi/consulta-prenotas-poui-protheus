@@ -1,0 +1,38 @@
+<section class="filtro" aria-label="Período de digitação">
+  <po-datepicker
+    data-testid="filtro-data-inicial"
+    class="data"
+    name="dataInicial"
+    p-label="Data Inicial"
+    [p-iso-format]="formatoIso"
+    [ngModel]="dataInicial()"
+    (ngModelChange)="dataInicial.set($event)"
+  />
+  <po-datepicker
+    data-testid="filtro-data-final"
+    class="data"
+    name="dataFinal"
+    p-label="Data Final"
+    [p-iso-format]="formatoIso"
+    [ngModel]="dataFinal()"
+    (ngModelChange)="dataFinal.set($event)"
+  />
+  <po-button
+    data-testid="filtro-filtrar"
+    class="acao"
+    p-label="Filtrar"
+    p-icon="an an-funnel"
+    p-kind="primary"
+    [p-loading]="carregando()"
+    (p-click)="aplicar()"
+  />
+  <po-button
+    data-testid="sintetica-exportar"
+    class="acao"
+    p-label="Exportar para Excel"
+    p-icon="an an-microsoft-excel-logo"
+    [p-disabled]="!exportavel()"
+    [p-loading]="exportando()"
+    (p-click)="pedirExportacao()"
+  />
+</section>

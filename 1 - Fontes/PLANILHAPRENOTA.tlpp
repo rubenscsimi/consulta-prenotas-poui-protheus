@@ -1,0 +1,622 @@
+#include "tlpp-core.th"
+
+namespace capitani.compras.prenota
+
+//PLANILHAPRENOTA - base das planilhas xlsx das pre-notas (pacote OOXML, estilos e celulas); usada por PLANILHASINTETICA e PLANILHAANALITICA
+
+#define REL_OFFICE   "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+#define NS_PLANILHA  "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+#define CT_OFFICE    "application/vnd.openxmlformats-officedocument."
+#define XML_DECL     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+
+#define TITULO       ("Pr" + Chr(233) + "-notas n" + Chr(227) + "o classificadas de ")
+#define TOTAL_GERAL  ("Total de Notas N" + Chr(227) + "o Classificadas")
+#define TRAVESSAO    (" " + Chr(150) + " ")
+
+#define LINHA_CABECALHO 3
+
+//Dia zero do sistema de datas 1900 do Excel: o serial de uma data e a diferenca em dias
+#define DIA_ZERO_EXCEL "18991230"
+
+#define ESTILO_TEXTO       0
+#define ESTILO_QTDE        1
+#define ESTILO_VALOR       2
+#define ESTILO_PERCENTUAL  3
+#define EM_NEGRITO         4
+#define ESTILO_TITULO      8
+#define ESTILO_CABECALHO   9
+#define ESTILO_DATA        10
+
+/*/{Protheus.doc} PlanilhaPrenota
+Base das planilhas xlsx das pre-notas de um periodo: monta o pacote OOXML no servidor e o devolve em base64.
+@type class
+@author Rubens Simi
+@since 30/10/2026
+/*/
+class PlanilhaPrenota
+
+    protected data oConsulta    as object
+    protected data cDataInicial as character
+    protected data cDataFinal   as character
+    protected data cNome        as character
+    private   data cPasta       as character
+    private   data aArquivos    as array
+    private   data aPastas      as array
+
+    public    method new(cDataInicial as character, cDataFinal as character, cCodFilial as character)
+    public    method arquivo() as json
+
+    protected method montar()
+    protected method gravarPacote(cAba as character, cPlanilha as character, lGrafico as logical)
+    protected method gravar(cParte as character, cXml as character)
+    protected method relacoes(aRelacoes as array) as character
+    protected method aba(aLarguras as array, cLinhas as character, lGrafico as logical) as character
+    protected method linhaDaAba(nLinha as numeric, cCelulas as character) as character
+    protected method titulo(cTexto as character) as character
+    protected method cabecalho(nLinha as numeric, aRotulos as array) as character
+    protected method celulaTexto(cColuna as character, nLinha as numeric, cTexto as character, lNegrito as logical) as character
+    protected method celulaQtde(cColuna as character, nLinha as numeric, nQtde as numeric, lNegrito as logical) as character
+    protected method celulaValor(cColuna as character, nLinha as numeric, nValor as numeric, lNegrito as logical) as character
+    protected method celulaPercentual(cColuna as character, nLinha as numeric, nFracao as numeric, lNegrito as logical) as character
+    protected method celulaData(cColuna as character, nLinha as numeric, cIso as character) as character
+    protected method tituloDoPeriodo() as character
+    protected method periodoNoNome() as character
+    protected method linhaCabecalho() as numeric
+    protected method rotuloFilial(cCodFilial as character, cNomeFilial as character) as character
+    protected method rotuloTotal() as character
+    protected method namespaceRelacoes() as character
+    protected method xml(cTexto as character) as character
+
+    private   method gerar() as json
+    private   method tiposDeConteudo(lGrafico as logical) as character
+    private   method pastaDeTrabalho(cAba as character) as character
+    private   method estilos() as character
+    private   method celula(cColuna as character, nLinha as numeric, cConteudo as character, nEstilo as numeric) as character
+    private   method celulaNumero(cColuna as character, nLinha as numeric, nNumero as numeric, nEstilo as numeric) as character
+    private   method criarPastas(cParte as character)
+    private   method compactar() as character
+    private   method apagarTemporarios()
+    private   method dataBr(cIso as character) as character
+
+endclass
+
+/*/{Protheus.doc} PlanilhaPrenota::new
+Prepara a consulta do periodo e da filial pedidos; a consulta valida os dois.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cDataInicial, character, data inicial de digitacao (AAAA-MM-DD)
+@param cDataFinal, character, data final de digitacao (AAAA-MM-DD)
+@param cCodFilial, character, filial da consulta; vazio considera todas as permitidas
+@return object, a propria planilha
+/*/
+method new(cDataInicial as character, cDataFinal as character, cCodFilial as character) class PlanilhaPrenota
+
+    self:cDataInicial := cDataInicial
+    self:cDataFinal   := cDataFinal
+    self:oConsulta    := ConsultaPrenota():new(cDataInicial, cDataFinal, cCodFilial)
+
+return self
+
+/*/{Protheus.doc} PlanilhaPrenota::arquivo
+Planilha do periodo montada pela especializacao (metodo montar); parametro recusado devolve o erro da consulta.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return json, nome e arquivo (base64), ou code, message e detailedMessage
+/*/
+method arquivo() as json class PlanilhaPrenota
+
+    Local jResposta as json
+
+    If self:oConsulta:valido()
+        jResposta := self:gerar()
+    Else
+        jResposta := self:oConsulta:erro()
+    EndIf
+
+return jResposta
+
+/*/{Protheus.doc} PlanilhaPrenota::gerar
+Monta e compacta o xlsx numa pasta temporaria propria e apaga os temporarios tambem quando a geracao falha.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return json, nome e arquivo (base64), ou o erro no modelo TOTVS
+/*/
+method gerar() as json class PlanilhaPrenota
+
+    Local jArquivo := JsonObject():new()
+    Local cBase64  := ""
+    Local oErro    as object
+
+    self:cPasta    := "/xlsx" + StrTran(FWUUIDV4(), "-", "") + "/"
+    self:aArquivos := {}
+    self:aPastas   := {}
+
+    Try
+        self:montar()
+        cBase64 := self:compactar()
+    Catch oErro
+        FWLogMsg("ERROR", Nil, "PRENOTAS", "PlanilhaPrenota", , "", oErro:description)
+    EndTry
+
+    self:apagarTemporarios()
+
+    If Empty(cBase64)
+        jArquivo["code"]            := "500"
+        jArquivo["message"]         := "Falha ao gerar a planilha."
+        jArquivo["detailedMessage"] := "Nao foi possivel montar o arquivo xlsx no servidor."
+    Else
+        jArquivo["nome"]    := self:cNome
+        jArquivo["arquivo"] := cBase64
+    EndIf
+
+return jArquivo
+
+/*/{Protheus.doc} PlanilhaPrenota::montar
+Le a consulta e grava as partes do pacote; cada especializacao sobrescreve.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+/*/
+method montar() class PlanilhaPrenota
+
+    UserException("PlanilhaPrenota:montar() deve ser sobrescrito pela especializacao.")
+
+return
+
+/*/{Protheus.doc} PlanilhaPrenota::gravarPacote
+Grava as partes comuns do pacote: tipos, relacoes, pasta de trabalho, estilos e a aba.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cAba, character, nome da aba em CP1252
+@param cPlanilha, character, XML da aba (xl/worksheets/sheet1.xml)
+@param lGrafico, logical, .T. quando a especializacao grava desenho e grafico
+/*/
+method gravarPacote(cAba as character, cPlanilha as character, lGrafico as logical) class PlanilhaPrenota
+
+    self:gravar("[Content_Types].xml", self:tiposDeConteudo(lGrafico))
+    self:gravar("_rels/.rels", self:relacoes({{"officeDocument", "xl/workbook.xml"}}))
+    self:gravar("xl/workbook.xml", self:pastaDeTrabalho(cAba))
+    self:gravar("xl/_rels/workbook.xml.rels", self:relacoes({{"worksheet", "worksheets/sheet1.xml"}, {"styles", "styles.xml"}}))
+    self:gravar("xl/styles.xml", self:estilos())
+    self:gravar("xl/worksheets/sheet1.xml", cPlanilha)
+
+return
+
+/*/{Protheus.doc} PlanilhaPrenota::tiposDeConteudo
+Parte [Content_Types].xml com o tipo de cada parte gravada.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param lGrafico, logical, .T. quando o pacote leva desenho e grafico
+@return character, XML da parte
+/*/
+method tiposDeConteudo(lGrafico as logical) as character class PlanilhaPrenota
+
+    Local cXml := '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    cXml += '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    cXml += '<Default Extension="xml" ContentType="application/xml"/>'
+    cXml += '<Override PartName="/xl/workbook.xml" ContentType="' + CT_OFFICE + 'spreadsheetml.sheet.main+xml"/>'
+    cXml += '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="' + CT_OFFICE + 'spreadsheetml.worksheet+xml"/>'
+    cXml += '<Override PartName="/xl/styles.xml" ContentType="' + CT_OFFICE + 'spreadsheetml.styles+xml"/>'
+    If lGrafico
+        cXml += '<Override PartName="/xl/drawings/drawing1.xml" ContentType="' + CT_OFFICE + 'drawing+xml"/>'
+        cXml += '<Override PartName="/xl/charts/chart1.xml" ContentType="' + CT_OFFICE + 'drawingml.chart+xml"/>'
+    EndIf
+    cXml += '</Types>'
+
+return cXml
+
+/*/{Protheus.doc} PlanilhaPrenota::relacoes
+Parte .rels com uma relacao por item, numeradas rId1, rId2...
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param aRelacoes, array, pares {tipo da relacao, alvo}
+@return character, XML da parte
+/*/
+method relacoes(aRelacoes as array) as character class PlanilhaPrenota
+
+    Local cXml      := '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    Local nRelacao  := 0
+
+    For nRelacao := 1 To Len(aRelacoes)
+        cXml += '<Relationship Id="rId' + cValToChar(nRelacao) + '" Type="' + REL_OFFICE + '/' + aRelacoes[nRelacao][1] + '"'
+        cXml += ' Target="' + aRelacoes[nRelacao][2] + '"/>'
+    Next nRelacao
+
+return cXml + '</Relationships>'
+
+/*/{Protheus.doc} PlanilhaPrenota::pastaDeTrabalho
+Parte xl/workbook.xml com a aba unica.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cAba, character, nome da aba em CP1252
+@return character, XML da parte
+/*/
+method pastaDeTrabalho(cAba as character) as character class PlanilhaPrenota
+
+    Local cXml := '<workbook xmlns="' + NS_PLANILHA + '" xmlns:r="' + REL_OFFICE + '">'
+
+    cXml += '<sheets><sheet name="' + self:xml(cAba) + '" sheetId="1" r:id="rId1"/></sheets>'
+    cXml += '</workbook>'
+
+return cXml
+
+/*/{Protheus.doc} PlanilhaPrenota::estilos
+Parte xl/styles.xml: texto, qtde, valor em R$, percentual e data, normais e em negrito, titulo e cabecalho.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, XML da parte
+/*/
+method estilos() as character class PlanilhaPrenota
+
+    Local aFormatos := {{0, 0, 0}, {1, 0, 0}, {164, 0, 0}, {10, 0, 0}, {0, 1, 0}, {1, 1, 0}, {164, 1, 0}, {10, 1, 0}, {0, 2, 0}, {0, 1, 2}, {165, 0, 0}}
+    Local cXml      := '<styleSheet xmlns="' + NS_PLANILHA + '">'
+    Local nFormato  := 0
+
+    cXml += '<numFmts count="2"><numFmt numFmtId="164" formatCode="&quot;R$ &quot;#,##0.00"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/></numFmts>'
+    cXml += '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font>'
+    cXml += '<font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts>'
+    cXml += '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
+    cXml += '<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill></fills>'
+    cXml += '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+    cXml += '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    cXml += '<cellXfs count="' + cValToChar(Len(aFormatos)) + '">'
+    For nFormato := 1 To Len(aFormatos)
+        cXml += '<xf numFmtId="' + cValToChar(aFormatos[nFormato][1]) + '" fontId="' + cValToChar(aFormatos[nFormato][2]) + '"'
+        cXml += ' fillId="' + cValToChar(aFormatos[nFormato][3]) + '" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>'
+    Next nFormato
+    cXml += '</cellXfs>'
+    cXml += '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+    cXml += '</styleSheet>'
+
+return cXml
+
+/*/{Protheus.doc} PlanilhaPrenota::aba
+XML da aba (xl/worksheets/sheet1.xml) com as larguras das colunas e as linhas ja montadas.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param aLarguras, array, largura de cada coluna, a partir da A
+@param cLinhas, character, XML das linhas (row)
+@param lGrafico, logical, .T. quando a aba leva o desenho do grafico
+@return character, XML da parte
+/*/
+method aba(aLarguras as array, cLinhas as character, lGrafico as logical) as character class PlanilhaPrenota
+
+    Local cXml    := '<worksheet xmlns="' + NS_PLANILHA + '" xmlns:r="' + REL_OFFICE + '"><cols>'
+    Local nColuna := 0
+
+    For nColuna := 1 To Len(aLarguras)
+        cXml += '<col min="' + cValToChar(nColuna) + '" max="' + cValToChar(nColuna) + '" width="' + cValToChar(aLarguras[nColuna]) + '" customWidth="1"/>'
+    Next nColuna
+    cXml += '</cols><sheetData>' + cLinhas + '</sheetData>'
+    If lGrafico
+        cXml += '<drawing r:id="rId1"/>'
+    EndIf
+    cXml += '</worksheet>'
+
+return cXml
+
+/*/{Protheus.doc} PlanilhaPrenota::linhaDaAba
+Linha (row) da aba com as celulas ja montadas.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param nLinha, numeric, numero da linha na aba
+@param cCelulas, character, XML das celulas
+@return character, XML da linha
+/*/
+method linhaDaAba(nLinha as numeric, cCelulas as character) as character class PlanilhaPrenota
+return '<row r="' + cValToChar(nLinha) + '">' + cCelulas + '</row>'
+
+/*/{Protheus.doc} PlanilhaPrenota::titulo
+Linha 1 da aba com o titulo em destaque.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cTexto, character, titulo em CP1252
+@return character, XML da linha
+/*/
+method titulo(cTexto as character) as character class PlanilhaPrenota
+return self:linhaDaAba(1, self:celula("A", 1, self:xml(cTexto), ESTILO_TITULO))
+
+/*/{Protheus.doc} PlanilhaPrenota::cabecalho
+Linha de cabecalho com um rotulo por coluna, a partir da A.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param nLinha, numeric, numero da linha na aba
+@param aRotulos, array, rotulos em CP1252
+@return character, XML da linha
+/*/
+method cabecalho(nLinha as numeric, aRotulos as array) as character class PlanilhaPrenota
+
+    Local cCelulas := ""
+    Local nRotulo  := 0
+
+    For nRotulo := 1 To Len(aRotulos)
+        cCelulas += self:celula(Chr(64 + nRotulo), nLinha, self:xml(aRotulos[nRotulo]), ESTILO_CABECALHO)
+    Next nRotulo
+
+return self:linhaDaAba(nLinha, cCelulas)
+
+/*/{Protheus.doc} PlanilhaPrenota::celulaTexto
+Celula de texto, com o texto escapado.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nLinha, numeric, numero da linha
+@param cTexto, character, texto em CP1252
+@param lNegrito, logical, .T. na linha de total
+@return character, XML da celula
+/*/
+method celulaTexto(cColuna as character, nLinha as numeric, cTexto as character, lNegrito as logical) as character class PlanilhaPrenota
+return self:celula(cColuna, nLinha, self:xml(cTexto), ESTILO_TEXTO + If(lNegrito, EM_NEGRITO, 0))
+
+/*/{Protheus.doc} PlanilhaPrenota::celulaQtde
+Celula numerica de quantidade inteira.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nLinha, numeric, numero da linha
+@param nQtde, numeric, quantidade
+@param lNegrito, logical, .T. na linha de total
+@return character, XML da celula
+/*/
+method celulaQtde(cColuna as character, nLinha as numeric, nQtde as numeric, lNegrito as logical) as character class PlanilhaPrenota
+return self:celulaNumero(cColuna, nLinha, nQtde, ESTILO_QTDE + If(lNegrito, EM_NEGRITO, 0))
+
+/*/{Protheus.doc} PlanilhaPrenota::celulaValor
+Celula numerica de valor em R$ com 2 casas.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nLinha, numeric, numero da linha
+@param nValor, numeric, valor
+@param lNegrito, logical, .T. na linha de total
+@return character, XML da celula
+/*/
+method celulaValor(cColuna as character, nLinha as numeric, nValor as numeric, lNegrito as logical) as character class PlanilhaPrenota
+return self:celulaNumero(cColuna, nLinha, nValor, ESTILO_VALOR + If(lNegrito, EM_NEGRITO, 0))
+
+/*/{Protheus.doc} PlanilhaPrenota::celulaPercentual
+Celula numerica de percentual com 2 casas.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nLinha, numeric, numero da linha
+@param nFracao, numeric, fracao (1 = 100%)
+@param lNegrito, logical, .T. na linha de total
+@return character, XML da celula
+/*/
+method celulaPercentual(cColuna as character, nLinha as numeric, nFracao as numeric, lNegrito as logical) as character class PlanilhaPrenota
+return self:celulaNumero(cColuna, nLinha, nFracao, ESTILO_PERCENTUAL + If(lNegrito, EM_NEGRITO, 0))
+
+/*/{Protheus.doc} PlanilhaPrenota::celulaData
+Celula de data do Excel (numero de serie, sem hora) exibida como DD/MM/AAAA.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nLinha, numeric, numero da linha
+@param cIso, character, data AAAA-MM-DD
+@return character, XML da celula
+/*/
+method celulaData(cColuna as character, nLinha as numeric, cIso as character) as character class PlanilhaPrenota
+return self:celulaNumero(cColuna, nLinha, StoD(StrTran(cIso, "-", "")) - StoD(DIA_ZERO_EXCEL), ESTILO_DATA)
+
+/*/{Protheus.doc} PlanilhaPrenota::celula
+Celula com o conteudo ja escapado: texto em linha (inlineStr).
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nLinha, numeric, numero da linha
+@param cConteudo, character, texto escapado
+@param nEstilo, numeric, indice em cellXfs
+@return character, XML da celula
+/*/
+method celula(cColuna as character, nLinha as numeric, cConteudo as character, nEstilo as numeric) as character class PlanilhaPrenota
+return '<c r="' + cColuna + cValToChar(nLinha) + '" s="' + cValToChar(nEstilo) + '" t="inlineStr"><is><t>' + cConteudo + '</t></is></c>'
+
+/*/{Protheus.doc} PlanilhaPrenota::celulaNumero
+Celula numerica com ponto decimal; o formato de exibicao vem do estilo.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nLinha, numeric, numero da linha
+@param nNumero, numeric, valor da celula
+@param nEstilo, numeric, indice em cellXfs
+@return character, XML da celula
+/*/
+method celulaNumero(cColuna as character, nLinha as numeric, nNumero as numeric, nEstilo as numeric) as character class PlanilhaPrenota
+return '<c r="' + cColuna + cValToChar(nLinha) + '" s="' + cValToChar(nEstilo) + '"><v>' + AllTrim(Str(nNumero, 20, 8)) + '</v></c>'
+
+/*/{Protheus.doc} PlanilhaPrenota::gravar
+Grava uma parte do pacote em UTF-8, com a declaracao XML, dentro da pasta temporaria.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cParte, character, caminho da parte dentro do pacote
+@param cXml, character, conteudo em CP1252
+/*/
+method gravar(cParte as character, cXml as character) class PlanilhaPrenota
+
+    Local cArquivo := self:cPasta + cParte
+    Local nHandle  := 0
+
+    self:criarPastas(cParte)
+    nHandle := FCreate(cArquivo, 0, , .F.)
+    If nHandle < 0
+        UserException("Nao foi possivel criar " + cArquivo + " (FError " + cValToChar(FError()) + ").")
+    EndIf
+    aAdd(self:aArquivos, cArquivo)
+    FWrite(nHandle, EncodeUTF8(XML_DECL + cXml))
+    FClose(nHandle)
+
+return
+
+/*/{Protheus.doc} PlanilhaPrenota::criarPastas
+Cria a pasta temporaria e as subpastas da parte que ainda nao existem.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cParte, character, caminho da parte dentro do pacote
+/*/
+method criarPastas(cParte as character) class PlanilhaPrenota
+
+    Local aNiveis := StrTokArr(cParte, "/")
+    Local cPasta  := self:cPasta
+    Local nNivel  := 0
+
+    For nNivel := 0 To Len(aNiveis) - 1
+        If nNivel > 0
+            cPasta += aNiveis[nNivel] + "/"
+        EndIf
+        If !ExistDir(cPasta, , .F.)
+            MakeDir(cPasta, , .F.)
+            aAdd(self:aPastas, cPasta)
+        EndIf
+    Next nNivel
+
+return
+
+/*/{Protheus.doc} PlanilhaPrenota::compactar
+Compacta as partes gravadas, com caminhos relativos a pasta temporaria, e devolve o zip em base64.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, xlsx em base64
+/*/
+method compactar() as character class PlanilhaPrenota
+
+    Local cZip         := self:cPasta + "planilha.zip"
+    Local aPartes      := aClone(self:aArquivos)
+    Local oCompactador := CompactadorZip():new()
+
+    aAdd(self:aArquivos, cZip)
+
+return Encode64(oCompactador:compactar(cZip, aPartes, self:cPasta))
+
+/*/{Protheus.doc} PlanilhaPrenota::apagarTemporarios
+Apaga as partes, o zip e as pastas criadas, da mais funda para a raiz.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+/*/
+method apagarTemporarios() class PlanilhaPrenota
+
+    Local nItem := 0
+
+    For nItem := 1 To Len(self:aArquivos)
+        FErase(self:aArquivos[nItem], , .F.)
+    Next nItem
+
+    For nItem := Len(self:aPastas) To 1 Step -1
+        DirRemove(self:aPastas[nItem], , .F.)
+    Next nItem
+
+return
+
+/*/{Protheus.doc} PlanilhaPrenota::tituloDoPeriodo
+Titulo da aba com o periodo.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, Pre-notas nao classificadas de DD/MM/AAAA a DD/MM/AAAA
+/*/
+method tituloDoPeriodo() as character class PlanilhaPrenota
+return TITULO + self:dataBr(self:cDataInicial) + " a " + self:dataBr(self:cDataFinal)
+
+/*/{Protheus.doc} PlanilhaPrenota::periodoNoNome
+Periodo para o nome do arquivo.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, AAAAMMDD-AAAAMMDD
+/*/
+method periodoNoNome() as character class PlanilhaPrenota
+return StrTran(self:cDataInicial, "-", "") + "-" + StrTran(self:cDataFinal, "-", "")
+
+/*/{Protheus.doc} PlanilhaPrenota::linhaCabecalho
+Linha do cabecalho da tabela, abaixo do titulo; as linhas de dados vem em seguida.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return numeric, numero da linha na aba
+/*/
+method linhaCabecalho() as numeric class PlanilhaPrenota
+return LINHA_CABECALHO
+
+/*/{Protheus.doc} PlanilhaPrenota::rotuloFilial
+Filial como aparece na planilha.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cCodFilial, character, codigo da filial
+@param cNomeFilial, character, nome da filial
+@return character, 01 - MATRIZ
+/*/
+method rotuloFilial(cCodFilial as character, cNomeFilial as character) as character class PlanilhaPrenota
+return cCodFilial + TRAVESSAO + cNomeFilial
+
+/*/{Protheus.doc} PlanilhaPrenota::rotuloTotal
+Rotulo da linha de total.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, Total de Notas Nao Classificadas
+/*/
+method rotuloTotal() as character class PlanilhaPrenota
+return TOTAL_GERAL
+
+/*/{Protheus.doc} PlanilhaPrenota::namespaceRelacoes
+Namespace das relacoes do Office (prefixo r:), para as partes que referenciam outra parte.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, URI do namespace
+/*/
+method namespaceRelacoes() as character class PlanilhaPrenota
+return REL_OFFICE
+
+/*/{Protheus.doc} PlanilhaPrenota::dataBr
+Data AAAA-MM-DD ja validada pela consulta, no formato DD/MM/AAAA.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cIso, character, data AAAA-MM-DD
+@return character, data DD/MM/AAAA
+/*/
+method dataBr(cIso as character) as character class PlanilhaPrenota
+return SubStr(cIso, 9, 2) + "/" + SubStr(cIso, 6, 2) + "/" + Left(cIso, 4)
+
+/*/{Protheus.doc} PlanilhaPrenota::xml
+Escapa o texto para conteudo ou atributo XML; todo texto variavel da planilha passa por aqui.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cTexto, character, texto em CP1252
+@return character, texto com & < > e aspas trocados por entidades
+/*/
+method xml(cTexto as character) as character class PlanilhaPrenota
+
+    Local cEscapado := StrTran(cTexto, "&", "&amp;")
+
+    cEscapado := StrTran(cEscapado, "<", "&lt;")
+    cEscapado := StrTran(cEscapado, ">", "&gt;")
+    cEscapado := StrTran(cEscapado, '"', "&quot;")
+
+return cEscapado

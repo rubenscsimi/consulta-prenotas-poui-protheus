@@ -1,0 +1,168 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+}
+
+.carregando {
+  position: absolute;
+  inset: 0;
+}
+
+.indicadores {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.paineis {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1;
+  min-height: 360px;
+  gap: 16px;
+}
+
+.painel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 20px;
+  background: var(--color-neutral-light-00);
+  border: 1px solid var(--color-neutral-light-20);
+  border-radius: var(--border-radius-md, 8px);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+.painel-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.painel-titulo {
+  margin: 0;
+  font-size: var(--font-size-default, 16px);
+  font-weight: 700;
+  color: var(--color-neutral-dark-90);
+}
+
+.metrica {
+  flex: none;
+}
+
+.dica {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-neutral-dark-70);
+}
+
+.grafico {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+}
+
+.grafico po-chart {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+// O po-chart fixa a altura do desenho em px; aqui ela passa a acompanhar o cartão.
+.grafico ::ng-deep #chart-container,
+.grafico ::ng-deep .po-chart {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: auto !important;
+}
+
+.leitor-de-tela {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tabela ::ng-deep table {
+  table-layout: auto;
+  width: 100%;
+}
+
+.filial {
+  display: block;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tabela ::ng-deep tbody:last-of-type td {
+  font-weight: 700;
+  background: var(--color-brand-01-lightest);
+  border-top: 2px solid var(--color-brand-01-base);
+}
+
+.estado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.estado-icone {
+  font-size: 48px;
+  color: var(--color-brand-01-base);
+}
+
+.estado-icone-erro {
+  color: var(--color-feedback-negative-base);
+}
+
+.estado-titulo {
+  margin: 0;
+  font-size: var(--font-size-lg, 20px);
+  font-weight: 600;
+  color: var(--color-neutral-dark-90);
+}
+
+.estado-texto {
+  margin: 0;
+  color: var(--color-neutral-dark-70);
+}
+
+@media (max-width: 1100px) {
+  .indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .paineis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

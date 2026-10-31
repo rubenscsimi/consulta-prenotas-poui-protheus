@@ -1,0 +1,102 @@
+@if (periodoDoFiltro(); as periodo) {
+  <app-filtro-periodo
+    [periodo]="periodo"
+    [carregando]="carregando()"
+    [exportando]="exportando()"
+    [exportavel]="exportavel()"
+    (filtrar)="carregar($event)"
+    (exportar)="exportar($event)"
+  />
+}
+
+<div class="area">
+  @if (carregando()) {
+    <po-loading-overlay data-testid="sintetica-carregando" class="carregando" p-text="Carregando as pré-notas" [p-screen-lock]="false" />
+  }
+
+  @if (falhou()) {
+    <section class="estado" data-testid="sintetica-erro">
+      <span class="an an-warning-circle estado-icone estado-icone-erro" aria-hidden="true"></span>
+      <h2 class="estado-titulo">Não foi possível consultar as pré-notas</h2>
+      <p class="estado-texto">Confira a conexão com o Protheus e tente de novo.</p>
+      <po-button p-label="Tentar de novo" p-icon="an an-arrow-clockwise" (p-click)="tentarDeNovo()" />
+    </section>
+  } @else if (resposta(); as sintetico) {
+    <section class="indicadores" aria-label="Indicadores do período">
+      <app-indicador
+        data-testid="kpi-quantidade"
+        rotulo="Qtde de notas"
+        icone="an an-files"
+        [valor]="total().quantidade | number"
+      />
+      <app-indicador
+        data-testid="kpi-valor"
+        rotulo="Valor total"
+        icone="an an-currency-dollar"
+        [valor]="total().valor | currency: 'BRL'"
+      />
+      <app-indicador
+        data-testid="kpi-filiais"
+        rotulo="Filiais com pendência"
+        icone="an an-buildings"
+        [valor]="filiaisComPendencia() | number"
+      />
+      <app-indicador
+        data-testid="kpi-valor-medio"
+        rotulo="Valor médio por nota"
+        icone="an an-calculator"
+        [valor]="valorMedio() | currency: 'BRL'"
+      />
+    </section>
+
+    @if (sintetico.items.length) {
+      <section class="paineis">
+        <article class="painel" data-testid="painel-tabela">
+          <h2 class="painel-titulo">Pré-notas por filial</h2>
+          <po-table
+            data-testid="sintetica-tabela"
+            class="tabela"
+            [p-columns]="colunas"
+            [p-items]="linhas()"
+            [p-hide-columns-manager]="true"
+          >
+            <ng-template p-table-cell-template let-row="row">
+              <span class="filial" (dblclick)="abrirAnalitica(row)">{{ row.descricao }}</span>
+            </ng-template>
+          </po-table>
+          <p class="dica" data-testid="sintetica-dica">
+            <span class="an an-cursor-click" aria-hidden="true"></span>
+            Dê um duplo clique em uma filial ou no total para ver as notas.
+          </p>
+        </article>
+
+        <article class="painel" data-testid="painel-grafico">
+          <header class="painel-cabecalho">
+            <h2 class="painel-titulo">Participação por filial</h2>
+            <po-button-group
+              data-testid="grafico-metrica"
+              class="metrica"
+              [p-buttons]="opcoesMetrica"
+              [p-toggle]="selecaoUnica"
+            />
+          </header>
+          <figure class="grafico">
+            <po-chart
+              data-testid="sintetica-grafico"
+              [p-type]="tipoGrafico"
+              [p-series]="fatias()"
+              [p-options]="opcoesGrafico"
+            />
+            <figcaption class="leitor-de-tela" data-testid="grafico-descricao">{{ descricaoGrafico() }}</figcaption>
+          </figure>
+        </article>
+      </section>
+    } @else {
+      <section class="painel estado" data-testid="sintetica-vazio">
+        <span class="an an-tray estado-icone" aria-hidden="true"></span>
+        <h2 class="estado-titulo">Nenhuma pré-nota aguardando classificação</h2>
+        <p class="estado-texto">Não há pré-notas digitadas no período. Escolha outras datas no filtro acima.</p>
+      </section>
+    }
+  }
+</div>

@@ -1,0 +1,28 @@
+<po-page-default
+  [p-title]="titulo()"
+  p-components-size="small"
+  [p-actions]="acoes()"
+>
+  @switch (periodoService.estado()) {
+    @case ('carregando') {
+      <po-loading-overlay p-text="Carregando o período" [p-screen-lock]="false" />
+    }
+    @case ('pronto') {
+      <router-outlet (activate)="mostrar($event)" />
+    }
+    @case ('foraDoProtheus') {
+      <section class="aviso">
+        <span class="an an-plugs aviso-icone" aria-hidden="true"></span>
+        <h2 class="aviso-titulo">Abra a consulta pelo Protheus</h2>
+        <p class="aviso-texto">O período de digitação vem das perguntas da rotina de pré-notas do SIGACOM.</p>
+      </section>
+    }
+    @case ('semResposta') {
+      <section class="aviso">
+        <span class="an an-warning-circle aviso-icone aviso-icone-alerta" aria-hidden="true"></span>
+        <h2 class="aviso-titulo">O período não chegou do Protheus</h2>
+        <p class="aviso-texto">Feche a consulta e abra de novo pela rotina de pré-notas.</p>
+      </section>
+    }
+  }
+</po-page-default>

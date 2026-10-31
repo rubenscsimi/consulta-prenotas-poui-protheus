@@ -1,0 +1,148 @@
+#include "tlpp-core.th"
+
+namespace capitani.compras.prenota
+
+//PLANILHAANALITICA - planilha xlsx da analitica (uma linha por pre-nota e o total); usada por PRENOTAS
+
+#define ABA          ("Anal" + Chr(237) + "tica")
+
+/*/{Protheus.doc} PlanilhaAnalitica
+Planilha xlsx da analitica do periodo, de uma filial ou de todas: uma linha por pre-nota e o total.
+@type class
+@author Rubens Simi
+@since 30/10/2026
+/*/
+class PlanilhaAnalitica from PlanilhaPrenota
+
+    private   data cCodFilial as character
+
+    public    method new(cDataInicial as character, cDataFinal as character, cCodFilial as character)
+
+    protected method montar()
+
+    private   method planilha(jAnalitico as json) as character
+    private   method linhaNota(nLinha as numeric, jNota as json) as character
+    private   method linhaTotal(nLinha as numeric, nValorDocumento as numeric, nValorItens as numeric) as character
+    private   method filial() as character
+
+endclass
+
+/*/{Protheus.doc} PlanilhaAnalitica::new
+Prepara a consulta analitica do periodo e da filial pedidos.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cDataInicial, character, data inicial de digitacao (AAAA-MM-DD)
+@param cDataFinal, character, data final de digitacao (AAAA-MM-DD)
+@param cCodFilial, character, filial; vazio considera todas as permitidas
+@return object, a propria planilha
+/*/
+method new(cDataInicial as character, cDataFinal as character, cCodFilial as character) class PlanilhaAnalitica
+
+    _Super:new(cDataInicial, cDataFinal, cCodFilial)
+    self:cCodFilial := AllTrim(cCodFilial)
+    self:cNome      := "prenotas-analitica-" + If(Empty(self:cCodFilial), "todas", self:cCodFilial) + "-" + self:periodoNoNome() + ".xlsx"
+
+return self
+
+/*/{Protheus.doc} PlanilhaAnalitica::montar
+Le a analitica e grava o pacote, sem grafico.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+/*/
+method montar() class PlanilhaAnalitica
+
+    self:gravarPacote(ABA, self:planilha(self:oConsulta:analitico()), .F.)
+
+return
+
+/*/{Protheus.doc} PlanilhaAnalitica::planilha
+Aba com o titulo (periodo e filial), cabecalho, uma linha por pre-nota e o total.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param jAnalitico, json, resposta da ConsultaPrenota:analitico
+@return character, XML da parte
+/*/
+method planilha(jAnalitico as json) as character class PlanilhaAnalitica
+
+    Local aNotas      := jAnalitico["items"]
+    Local cLinhas     := self:titulo(self:tituloDoPeriodo() + " (" + self:filial() + ")")
+    Local nValorItens := 0
+    Local nNota       := 0
+    Local nLinha      := self:linhaCabecalho()
+
+    cLinhas += self:cabecalho(nLinha, {"Filial", "Fornecedor", "Loja", "Raz" + Chr(227) + "o Social", "Documento", "S" + Chr(233) + "rie", ;
+        "Data de Digita" + Chr(231) + Chr(227) + "o", "Data de Emiss" + Chr(227) + "o", "Valor do Documento", "Valor dos Itens"})
+
+    For nNota := 1 To Len(aNotas)
+        nLinha++
+        cLinhas     += self:linhaNota(nLinha, aNotas[nNota])
+        nValorItens += aNotas[nNota]["valorItens"]
+    Next nNota
+
+    cLinhas += self:linhaTotal(nLinha + 1, jAnalitico["total"]["valor"], Round(nValorItens, 2))
+
+return self:aba({8, 12, 6, 50, 12, 7, 18, 16, 20, 17}, cLinhas, .F.)
+
+/*/{Protheus.doc} PlanilhaAnalitica::linhaNota
+Linha de uma pre-nota: codigos como texto, datas como data do Excel e valores em R$.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param nLinha, numeric, numero da linha na aba
+@param jNota, json, item da ConsultaPrenota:analitico
+@return character, XML da linha
+/*/
+method linhaNota(nLinha as numeric, jNota as json) as character class PlanilhaAnalitica
+
+    Local cCelulas := self:celulaTexto("A", nLinha, jNota["filial"], .F.)
+
+    cCelulas += self:celulaTexto("B", nLinha, jNota["fornecedor"], .F.)
+    cCelulas += self:celulaTexto("C", nLinha, jNota["loja"], .F.)
+    cCelulas += self:celulaTexto("D", nLinha, jNota["razaoSocial"], .F.)
+    cCelulas += self:celulaTexto("E", nLinha, jNota["documento"], .F.)
+    cCelulas += self:celulaTexto("F", nLinha, jNota["serie"], .F.)
+    cCelulas += self:celulaData("G", nLinha, jNota["dataDigitacao"])
+    cCelulas += self:celulaData("H", nLinha, jNota["dataEmissao"])
+    cCelulas += self:celulaValor("I", nLinha, jNota["valorDocumento"], .F.)
+    cCelulas += self:celulaValor("J", nLinha, jNota["valorItens"], .F.)
+
+return self:linhaDaAba(nLinha, cCelulas)
+
+/*/{Protheus.doc} PlanilhaAnalitica::linhaTotal
+Linha do total, em negrito, com as duas colunas de valor.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param nLinha, numeric, numero da linha na aba
+@param nValorDocumento, numeric, soma do valor do documento
+@param nValorItens, numeric, soma do valor dos itens
+@return character, XML da linha
+/*/
+method linhaTotal(nLinha as numeric, nValorDocumento as numeric, nValorItens as numeric) as character class PlanilhaAnalitica
+
+    Local cCelulas := self:celulaTexto("A", nLinha, self:rotuloTotal(), .T.)
+
+    cCelulas += self:celulaValor("I", nLinha, nValorDocumento, .T.)
+    cCelulas += self:celulaValor("J", nLinha, nValorItens, .T.)
+
+return self:linhaDaAba(nLinha, cCelulas)
+
+/*/{Protheus.doc} PlanilhaAnalitica::filial
+Filial do titulo, ja validada pela consulta.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, 01 - MATRIZ, ou Todas as filiais
+/*/
+method filial() as character class PlanilhaAnalitica
+
+    Local cRotulo := "Todas as filiais"
+
+    If !Empty(self:cCodFilial)
+        cRotulo := self:rotuloFilial(self:cCodFilial, self:oConsulta:nomeFilial(self:cCodFilial))
+    EndIf
+
+return cRotulo

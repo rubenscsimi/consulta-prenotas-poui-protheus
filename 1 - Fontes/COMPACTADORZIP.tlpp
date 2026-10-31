@@ -1,0 +1,184 @@
+#include "tlpp-core.th"
+#include "fileio.ch"
+
+namespace capitani.compras.prenota
+
+//COMPACTADORZIP - zip de uma pasta do servidor com o nome de cada entrada em "/"; usado por PLANILHAPRENOTA
+
+//Campos da APPNOTE: fim do diretorio central (4.3.16), entrada central (4.3.12) e cabecalho local (4.3.7)
+#define ZIP_FIM_CENTRAL     ("PK" + Chr(5) + Chr(6))
+#define ZIP_FIM_ENTRADAS    10
+#define ZIP_FIM_INICIO      16
+#define ZIP_CENTRAL_TAM     46
+#define ZIP_CENTRAL_NOME    28
+#define ZIP_CENTRAL_EXTRA   30
+#define ZIP_CENTRAL_COMENT  32
+#define ZIP_CENTRAL_LOCAL   42
+#define ZIP_LOCAL_TAM       30
+#define ZIP_CURTO           2
+#define ZIP_LONGO           4
+
+/*/{Protheus.doc} CompactadorZip
+Compacta arquivos de uma pasta do servidor e grava o nome de cada entrada com "/", como o ZIP e o OPC pedem em qualquer sistema operacional.
+@type class
+@author Rubens Simi
+@since 30/10/2026
+/*/
+class CompactadorZip
+
+    public  method new()
+    public  method compactar(cArquivoZip as character, aArquivos as array, cPasta as character) as character
+
+    private method lerArquivo(cArquivo as character) as character
+    private method nomesComBarra(cZip as character) as character
+    private method barraNoNome(cZip as character, nInicio as numeric, nTamanho as numeric) as character
+    private method tamanhoEntrada(cZip as character, nCentral as numeric) as numeric
+    private method posicao(cZip as character, nCampo as numeric) as numeric
+    private method inteiro(cDados as character, nInicio as numeric, nBytes as numeric) as numeric
+
+endclass
+
+/*/{Protheus.doc} CompactadorZip::new
+Cria o compactador.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return object, o proprio compactador
+/*/
+method new() class CompactadorZip
+return self
+
+/*/{Protheus.doc} CompactadorZip::compactar
+Compacta os arquivos com caminhos relativos a pasta e devolve o zip com os nomes em "/".
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cArquivoZip, character, zip a criar; quem chama o apaga
+@param aArquivos, array, arquivos a compactar
+@param cPasta, character, pasta base dos caminhos gravados no zip
+@return character, conteudo do zip
+/*/
+method compactar(cArquivoZip as character, aArquivos as array, cPasta as character) as character class CompactadorZip
+
+    Local nRetorno := FZip(cArquivoZip, aArquivos, cPasta, , .F.)
+
+    If nRetorno != 0
+        UserException("FZip devolveu " + cValToChar(nRetorno) + ".")
+    EndIf
+
+return self:nomesComBarra(self:lerArquivo(cArquivoZip))
+
+/*/{Protheus.doc} CompactadorZip::lerArquivo
+Le um arquivo binario inteiro.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cArquivo, character, caminho no servidor
+@return character, conteudo do arquivo
+/*/
+method lerArquivo(cArquivo as character) as character class CompactadorZip
+
+    Local nHandle  := FOpen(cArquivo, FO_READ, , .F.)
+    Local nTamanho := 0
+    Local cDados   := ""
+
+    If nHandle < 0
+        UserException("Nao foi possivel ler " + cArquivo + " (FError " + cValToChar(FError()) + ").")
+    EndIf
+    nTamanho := FSeek(nHandle, 0, FS_END)
+    cDados   := Space(nTamanho)
+    FSeek(nHandle, 0, FS_SET)
+    FRead(nHandle, @cDados, nTamanho)
+    FClose(nHandle)
+
+return cDados
+
+/*/{Protheus.doc} CompactadorZip::nomesComBarra
+Troca a barra invertida por "/" no nome de cada entrada, no diretorio central e no cabecalho local.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cZip, character, conteudo do zip
+@return character, zip com os nomes em "/"
+/*/
+method nomesComBarra(cZip as character) as character class CompactadorZip
+
+    Local nFim      := RAt(ZIP_FIM_CENTRAL, cZip)
+    Local nEntradas := self:inteiro(cZip, nFim + ZIP_FIM_ENTRADAS, ZIP_CURTO)
+    Local nCentral  := self:posicao(cZip, nFim + ZIP_FIM_INICIO)
+    Local nEntrada  := 0
+    Local nNome     := 0
+    Local nLocal    := 0
+
+    For nEntrada := 1 To nEntradas
+        nNome    := self:inteiro(cZip, nCentral + ZIP_CENTRAL_NOME, ZIP_CURTO)
+        nLocal   := self:posicao(cZip, nCentral + ZIP_CENTRAL_LOCAL)
+        cZip     := self:barraNoNome(cZip, nCentral + ZIP_CENTRAL_TAM, nNome)
+        cZip     := self:barraNoNome(cZip, nLocal + ZIP_LOCAL_TAM, nNome)
+        nCentral += self:tamanhoEntrada(cZip, nCentral)
+    Next nEntrada
+
+return cZip
+
+/*/{Protheus.doc} CompactadorZip::barraNoNome
+Troca a barra invertida por "/" num nome gravado dentro do zip.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cZip, character, conteudo do zip
+@param nInicio, numeric, posicao do nome
+@param nTamanho, numeric, tamanho do nome
+@return character, zip com o nome trocado
+/*/
+method barraNoNome(cZip as character, nInicio as numeric, nTamanho as numeric) as character class CompactadorZip
+return Stuff(cZip, nInicio, nTamanho, StrTran(SubStr(cZip, nInicio, nTamanho), "\", "/"))
+
+/*/{Protheus.doc} CompactadorZip::tamanhoEntrada
+Tamanho de uma entrada do diretorio central: parte fixa, nome, campo extra e comentario.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cZip, character, conteudo do zip
+@param nCentral, numeric, posicao da entrada
+@return numeric, tamanho da entrada em bytes
+/*/
+method tamanhoEntrada(cZip as character, nCentral as numeric) as numeric class CompactadorZip
+
+    Local nNome       := self:inteiro(cZip, nCentral + ZIP_CENTRAL_NOME, ZIP_CURTO)
+    Local nExtra      := self:inteiro(cZip, nCentral + ZIP_CENTRAL_EXTRA, ZIP_CURTO)
+    Local nComentario := self:inteiro(cZip, nCentral + ZIP_CENTRAL_COMENT, ZIP_CURTO)
+
+return ZIP_CENTRAL_TAM + nNome + nExtra + nComentario
+
+/*/{Protheus.doc} CompactadorZip::posicao
+Le um deslocamento gravado no zip, contado a partir de 0, como posicao de string, contada a partir de 1.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cZip, character, conteudo do zip
+@param nCampo, numeric, posicao do campo de deslocamento
+@return numeric, posicao do byte apontado
+/*/
+method posicao(cZip as character, nCampo as numeric) as numeric class CompactadorZip
+return self:inteiro(cZip, nCampo, ZIP_LONGO) + 1
+
+/*/{Protheus.doc} CompactadorZip::inteiro
+Le um inteiro sem sinal gravado em little-endian.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cDados, character, conteudo binario
+@param nInicio, numeric, posicao do primeiro byte
+@param nBytes, numeric, quantidade de bytes
+@return numeric, valor lido
+/*/
+method inteiro(cDados as character, nInicio as numeric, nBytes as numeric) as numeric class CompactadorZip
+
+    Local nValor := 0
+    Local nByte  := 0
+
+    For nByte := nBytes - 1 To 0 Step -1
+        nValor := nValor * 256 + Asc(SubStr(cDados, nInicio + nByte, 1))
+    Next nByte
+
+return nValor

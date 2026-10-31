@@ -1,0 +1,18 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+// O PO UI fixa a altura do conteúdo em px; em flex a tela ocupa a janela sem segunda rolagem.
+po-page-content,
+.po-page-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.po-page-content {
+  height: auto !important;
+}

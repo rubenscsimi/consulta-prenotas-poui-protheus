@@ -1,0 +1,71 @@
+<section class="cabecalho" data-testid="analitica-cabecalho" aria-label="Consulta analítica">
+  <dl class="resumo">
+    <div class="resumo-item">
+      <dt>Filial</dt>
+      <dd data-testid="analitica-filial">{{ rotuloFilial() }}</dd>
+    </div>
+    @if (periodo(); as periodo) {
+      <div class="resumo-item">
+        <dt>Período de digitação</dt>
+        <dd data-testid="analitica-periodo">
+          {{ periodo.dataInicial | date: 'dd/MM/yyyy' }} a {{ periodo.dataFinal | date: 'dd/MM/yyyy' }}
+        </dd>
+      </div>
+    }
+    @if (resposta()) {
+      <div class="resumo-item">
+        <dt>Qtde de notas</dt>
+        <dd data-testid="analitica-quantidade">{{ quantidade() | number }}</dd>
+      </div>
+    }
+  </dl>
+  <po-button
+    data-testid="analitica-voltar"
+    p-label="Voltar"
+    p-icon="an an-arrow-left"
+    (p-click)="voltar()"
+  />
+  <po-button
+    data-testid="analitica-exportar"
+    p-label="Exportar para Excel"
+    p-icon="an an-microsoft-excel-logo"
+    p-kind="primary"
+    [p-disabled]="!exportavel()"
+    [p-loading]="exportando()"
+    (p-click)="exportar()"
+  />
+</section>
+
+<div class="area" data-testid="analitica">
+  @if (carregando()) {
+    <po-loading-overlay data-testid="analitica-carregando" class="carregando" p-text="Carregando as notas" [p-screen-lock]="false" />
+  }
+
+  @if (erro(); as mensagem) {
+    <section class="painel estado" data-testid="analitica-erro">
+      <span class="an an-warning-circle estado-icone estado-icone-erro" aria-hidden="true"></span>
+      <h2 class="estado-titulo">Não foi possível consultar as notas</h2>
+      <p class="estado-texto">{{ mensagem }}</p>
+      <po-button p-label="Tentar de novo" p-icon="an an-arrow-clockwise" (p-click)="carregar()" />
+    </section>
+  } @else if (resposta(); as analitico) {
+    @if (analitico.items.length) {
+      <article class="painel">
+        <po-table
+          data-testid="analitica-tabela"
+          class="tabela"
+          [p-columns]="colunas"
+          [p-items]="linhas()"
+          [p-hide-columns-manager]="true"
+          [p-text-wrap]="true"
+        />
+      </article>
+    } @else {
+      <section class="painel estado" data-testid="analitica-vazio">
+        <span class="an an-tray estado-icone" aria-hidden="true"></span>
+        <h2 class="estado-titulo">Nenhuma pré-nota aguardando classificação</h2>
+        <p class="estado-texto">Não há notas desta seleção no período. Volte e escolha outras datas no filtro.</p>
+      </section>
+    }
+  }
+</div>

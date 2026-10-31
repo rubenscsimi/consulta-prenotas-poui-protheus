@@ -1,0 +1,15 @@
+.filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.data {
+  width: 180px;
+}
+
+// Alinha os botões à caixa de data, acima da área de mensagem do po-datepicker.
+.acao {
+  margin-bottom: 12px;
+}

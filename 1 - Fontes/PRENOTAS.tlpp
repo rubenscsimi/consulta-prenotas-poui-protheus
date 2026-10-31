@@ -1,0 +1,231 @@
+#include "tlpp-core.th"
+
+namespace capitani.compras.prenota
+
+//PRENOTAS - pede o periodo de digitacao e abre o app PO UI prenotas; menu do SIGACOM
+
+Static cPeriodo as character
+
+/*/{Protheus.doc} prenotas
+Consulta das pre-notas nao classificadas: pede o periodo e abre o app prenotas com ele.
+@type user function
+@author Rubens Simi
+@since 30/10/2026
+/*/
+User Function prenotas()
+
+    Local aPeriodo := {} as array
+
+    If !IsBlind() .And. PedirPeriodo(@aPeriodo)
+        cPeriodo := PeriodoJson(aPeriodo[1], aPeriodo[2])
+        FWCallApp("prenotas", , , , , "capitani.compras.prenota.prenotas")
+    EndIf
+
+Return
+
+/*/{Protheus.doc} jsToAdvpl
+Canal do FWCallApp: responde aos pedidos do app: "periodo" com o periodo informado, "sintetico" e "analitico" com a consulta, "exportarSintetico" e "exportarAnalitico" com a planilha xlsx.
+@type user function
+@author Rubens Simi
+@since 30/10/2026
+@param oWebChannel, object, canal do app aberto
+@param cType, character, chave do pedido do app
+@param cContent, character, conteudo do pedido
+@obs Padrao TOTVS: MATA038.PRW:442, PGCA010.PRW:56
+/*/
+User Function jsToAdvpl(oWebChannel as object, cType as character, cContent as character)
+
+    Do Case
+        Case cType == "periodo"
+            U_EnviarAoApp(oWebChannel, "periodo", cPeriodo)
+        Case cType == "sintetico"
+            U_EnviarAoApp(oWebChannel, "sintetico", SinteticoJson(cContent))
+        Case cType == "analitico"
+            U_EnviarAoApp(oWebChannel, "analitico", AnaliticoJson(cContent))
+        Case cType == "exportarSintetico"
+            U_EnviarAoApp(oWebChannel, "exportarSintetico", PlanilhaSinteticaJson(cContent))
+        Case cType == "exportarAnalitico"
+            U_EnviarAoApp(oWebChannel, "exportarAnalitico", PlanilhaAnaliticaJson(cContent))
+    EndCase
+
+Return
+
+/*/{Protheus.doc} EnviarAoApp
+Envia o texto ao app em UTF-8, o que o canal espera para acentos.
+@type user function
+@author Rubens Simi
+@since 30/10/2026
+@param oWebChannel, object, canal do app aberto
+@param cType, character, chave da resposta
+@param cTexto, character, texto da resposta em CP1252
+/*/
+User Function EnviarAoApp(oWebChannel as object, cType as character, cTexto as character)
+
+    oWebChannel:AdvPLToJS(cType, EncodeUTF8(cTexto))
+
+Return
+
+/*/{Protheus.doc} SinteticoJson
+Quantidade e valor por filial no periodo pedido pelo app, no formato da API; periodo recusado devolve o erro.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param cPeriodoApp, character, periodo no formato {"dataInicial":"AAAA-MM-DD","dataFinal":"AAAA-MM-DD"}
+@return character, JSON com items e total, ou com code, message e detailedMessage
+/*/
+Static Function SinteticoJson(cPeriodoApp as character) as character
+
+    Local jPeriodo  := JsonObject():new() as json
+    Local jResposta as json
+    Local oConsulta as object
+
+    jPeriodo:fromJson(cPeriodoApp)
+    oConsulta := ConsultaPrenota():new(jPeriodo:getJsonText("dataInicial"), jPeriodo:getJsonText("dataFinal"), "")
+
+    If oConsulta:valido()
+        jResposta := oConsulta:sintetico()
+    Else
+        jResposta := oConsulta:erro()
+    EndIf
+
+Return jResposta:toJson()
+
+/*/{Protheus.doc} AnaliticoJson
+Pre-notas do periodo e da filial pedidos pelo app, no formato da API; parametro recusado devolve o erro.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param cPedidoApp, character, pedido no formato {"dataInicial":"AAAA-MM-DD","dataFinal":"AAAA-MM-DD","filial":"01"}; sem filial, todas
+@return character, JSON com items e total, ou com code, message e detailedMessage
+/*/
+Static Function AnaliticoJson(cPedidoApp as character) as character
+
+    Local jPedido   := JsonObject():new() as json
+    Local jResposta as json
+    Local oConsulta as object
+
+    jPedido:fromJson(cPedidoApp)
+    oConsulta := ConsultaPrenota():new(jPedido:getJsonText("dataInicial"), jPedido:getJsonText("dataFinal"), FilialDoPedido(jPedido))
+
+    If oConsulta:valido()
+        jResposta := oConsulta:analitico()
+    Else
+        jResposta := oConsulta:erro()
+    EndIf
+
+Return jResposta:toJson()
+
+/*/{Protheus.doc} PlanilhaSinteticaJson
+Planilha xlsx da sintetica do periodo pedido pelo app, em base64; periodo recusado devolve o erro.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param cPeriodoApp, character, periodo no formato {"dataInicial":"AAAA-MM-DD","dataFinal":"AAAA-MM-DD"}
+@return character, JSON com nome e arquivo, ou com code, message e detailedMessage
+/*/
+Static Function PlanilhaSinteticaJson(cPeriodoApp as character) as character
+
+    Local jPeriodo  := JsonObject():new() as json
+    Local jResposta as json
+    Local oPlanilha as object
+
+    jPeriodo:fromJson(cPeriodoApp)
+    oPlanilha := PlanilhaSintetica():new(jPeriodo:getJsonText("dataInicial"), jPeriodo:getJsonText("dataFinal"))
+    jResposta := oPlanilha:arquivo()
+
+Return jResposta:toJson()
+
+/*/{Protheus.doc} PlanilhaAnaliticaJson
+Planilha xlsx da analitica do periodo e da filial pedidos pelo app, em base64; parametro recusado devolve o erro.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param cPedidoApp, character, pedido no formato {"dataInicial":"AAAA-MM-DD","dataFinal":"AAAA-MM-DD","filial":"01"}; sem filial, todas
+@return character, JSON com nome e arquivo, ou com code, message e detailedMessage
+/*/
+Static Function PlanilhaAnaliticaJson(cPedidoApp as character) as character
+
+    Local jPedido   := JsonObject():new() as json
+    Local jResposta as json
+    Local oPlanilha as object
+
+    jPedido:fromJson(cPedidoApp)
+    oPlanilha := PlanilhaAnalitica():new(jPedido:getJsonText("dataInicial"), jPedido:getJsonText("dataFinal"), FilialDoPedido(jPedido))
+    jResposta := oPlanilha:arquivo()
+
+Return jResposta:toJson()
+
+/*/{Protheus.doc} FilialDoPedido
+Filial pedida pelo app; ausente vira vazio (todas as filiais), e a consulta valida o resto.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param jPedido, json, pedido do app
+@return character, codigo da filial ou vazio
+/*/
+Static Function FilialDoPedido(jPedido as json) as character
+Return If(jPedido:hasProperty("filial"), jPedido:getJsonText("filial"), "")
+
+/*/{Protheus.doc} PedirPeriodo
+Perguntas Data Inicial e Data Final; o Ok so fecha com periodo aceito pela consulta.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param aPeriodo, array, recebe {data inicial, data final} por referencia
+@return logical, .T. quando o usuario confirmou um periodo valido
+/*/
+Static Function PedirPeriodo(aPeriodo as array) as logical
+
+    Local aPerguntas := {} as array
+
+    aAdd(aPerguntas, {1, "Data Inicial", FirstDate(dDataBase), "", "", "", "", 50, .F.})
+    aAdd(aPerguntas, {1, "Data Final",   dDataBase,            "", "", "", "", 50, .F.})
+
+Return ParamBox(aPerguntas, "Pré-notas não classificadas", @aPeriodo, {|| PeriodoValido(aPeriodo)}, , , , , , , .F., .F.)
+
+/*/{Protheus.doc} PeriodoValido
+Valida o periodo pela regra da consulta e avisa o motivo da recusa.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param aPeriodo, array, {data inicial, data final}
+@return logical, .T. quando o periodo e aceito
+/*/
+Static Function PeriodoValido(aPeriodo as array) as logical
+
+    Local oConsulta := ConsultaPrenota():new(DataIso(aPeriodo[1]), DataIso(aPeriodo[2]), "")
+
+    If !oConsulta:valido()
+        FWAlertWarning(oConsulta:erro()["detailedMessage"], "Período inválido")
+    EndIf
+
+Return oConsulta:valido()
+
+/*/{Protheus.doc} PeriodoJson
+Periodo no formato que o app recebe: {"dataInicial":"AAAA-MM-DD","dataFinal":"AAAA-MM-DD"}.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param dInicial, date, data inicial
+@param dFinal, date, data final
+@return character, JSON do periodo
+/*/
+Static Function PeriodoJson(dInicial as date, dFinal as date) as character
+
+    Local jPeriodo := JsonObject():new() as json
+
+    jPeriodo["dataInicial"] := DataIso(dInicial)
+    jPeriodo["dataFinal"]   := DataIso(dFinal)
+
+Return jPeriodo:toJson()
+
+/*/{Protheus.doc} DataIso
+Data no formato AAAA-MM-DD.
+@type static function
+@author Rubens Simi
+@since 30/10/2026
+@param dData, date, data a converter
+@return character, data no formato AAAA-MM-DD
+/*/
+Static Function DataIso(dData as date) as character
+Return If(Empty(dData), "", Transform(DToS(dData), "@R 9999-99-99"))

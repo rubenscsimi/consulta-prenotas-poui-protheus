@@ -1,0 +1,195 @@
+#include "tlpp-core.th"
+
+namespace capitani.compras.prenota
+
+//PLANILHASINTETICA - planilha xlsx da sintetica com grafico de pizza nativo do Excel; usada por PRENOTAS
+
+#define NS_DESENHO   "http://schemas.openxmlformats.org/drawingml/2006/main"
+#define NS_GRAFICO   "http://schemas.openxmlformats.org/drawingml/2006/chart"
+
+#define ABA          ("Sint" + Chr(233) + "tica")
+
+/*/{Protheus.doc} PlanilhaSintetica
+Planilha xlsx da sintetica do periodo: tabela por filial, total geral e pizza nativa da serie Valor.
+@type class
+@author Rubens Simi
+@since 30/10/2026
+/*/
+class PlanilhaSintetica from PlanilhaPrenota
+
+    public    method new(cDataInicial as character, cDataFinal as character)
+
+    protected method montar()
+
+    private   method planilha(jSintetico as json, lGrafico as logical) as character
+    private   method linha(nLinha as numeric, cRotulo as character, nQtde as numeric, nValor as numeric, nPercentual as numeric, lTotal as logical) as character
+    private   method desenho() as character
+    private   method grafico(nFiliais as numeric) as character
+    private   method intervalo(cColuna as character, nPrimeira as numeric, nUltima as numeric) as character
+
+endclass
+
+/*/{Protheus.doc} PlanilhaSintetica::new
+Prepara a consulta sintetica do periodo pedido.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cDataInicial, character, data inicial de digitacao (AAAA-MM-DD)
+@param cDataFinal, character, data final de digitacao (AAAA-MM-DD)
+@return object, a propria planilha
+/*/
+method new(cDataInicial as character, cDataFinal as character) class PlanilhaSintetica
+
+    _Super:new(cDataInicial, cDataFinal, "")
+    self:cNome := "prenotas-sintetica-" + self:periodoNoNome() + ".xlsx"
+
+return self
+
+/*/{Protheus.doc} PlanilhaSintetica::montar
+Le a sintetica e grava o pacote; a cadeia desenho e grafico so quando ha filial.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+/*/
+method montar() class PlanilhaSintetica
+
+    Local jSintetico := self:oConsulta:sintetico()
+    Local nFiliais   := Len(jSintetico["items"])
+    Local lGrafico   := nFiliais > 0
+
+    self:gravarPacote(ABA, self:planilha(jSintetico, lGrafico), lGrafico)
+
+    If lGrafico
+        self:gravar("xl/worksheets/_rels/sheet1.xml.rels", self:relacoes({{"drawing", "../drawings/drawing1.xml"}}))
+        self:gravar("xl/drawings/drawing1.xml", self:desenho())
+        self:gravar("xl/drawings/_rels/drawing1.xml.rels", self:relacoes({{"chart", "../charts/chart1.xml"}}))
+        self:gravar("xl/charts/chart1.xml", self:grafico(nFiliais))
+    EndIf
+
+return
+
+/*/{Protheus.doc} PlanilhaSintetica::planilha
+Aba com o titulo do periodo, cabecalho, uma linha por filial e o total geral.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param jSintetico, json, resposta da ConsultaPrenota:sintetico
+@param lGrafico, logical, .T. quando a aba leva o desenho do grafico
+@return character, XML da parte
+/*/
+method planilha(jSintetico as json, lGrafico as logical) as character class PlanilhaSintetica
+
+    Local aItems  := jSintetico["items"]
+    Local jTotal  := jSintetico["total"]
+    Local cLinhas := self:titulo(self:tituloDoPeriodo())
+    Local nItem   := 0
+    Local nLinha  := self:linhaCabecalho()
+
+    cLinhas += self:cabecalho(nLinha, {"Filial", "Qtde Notas", "Valor Total das Notas", "% do total"})
+
+    For nItem := 1 To Len(aItems)
+        nLinha++
+        cLinhas += self:linha(nLinha, self:rotuloFilial(aItems[nItem]["filial"], aItems[nItem]["nomeFilial"]), aItems[nItem]["quantidade"], ;
+            aItems[nItem]["valor"], aItems[nItem]["valor"] / jTotal["valor"], .F.)
+    Next nItem
+
+    cLinhas += self:linha(nLinha + 1, self:rotuloTotal(), jTotal["quantidade"], jTotal["valor"], If(jTotal["valor"] > 0, 1, 0), .T.)
+
+return self:aba({38, 13, 23, 12}, cLinhas, lGrafico)
+
+/*/{Protheus.doc} PlanilhaSintetica::linha
+Linha da tabela com rotulo, qtde, valor e percentual; no total, em negrito.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param nLinha, numeric, numero da linha na aba
+@param cRotulo, character, filial ou texto do total
+@param nQtde, numeric, quantidade de notas
+@param nValor, numeric, valor total das notas
+@param nPercentual, numeric, fracao do valor sobre o total geral
+@param lTotal, logical, .T. na linha do total geral
+@return character, XML da linha
+/*/
+method linha(nLinha as numeric, cRotulo as character, nQtde as numeric, nValor as numeric, nPercentual as numeric, lTotal as logical) as character class PlanilhaSintetica
+
+    Local cCelulas := self:celulaTexto("A", nLinha, cRotulo, lTotal)
+
+    cCelulas += self:celulaQtde("B", nLinha, nQtde, lTotal)
+    cCelulas += self:celulaValor("C", nLinha, nValor, lTotal)
+    cCelulas += self:celulaPercentual("D", nLinha, nPercentual, lTotal)
+
+return self:linhaDaAba(nLinha, cCelulas)
+
+/*/{Protheus.doc} PlanilhaSintetica::desenho
+Parte xl/drawings/drawing1.xml: ancora o grafico ao lado da tabela, de F3 a N23.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@return character, XML da parte
+/*/
+method desenho() as character class PlanilhaSintetica
+
+    Local cXml := '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="' + NS_DESENHO + '">'
+
+    cXml += '<xdr:twoCellAnchor>'
+    cXml += '<xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>'
+    cXml += '<xdr:to><xdr:col>13</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>22</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>'
+    cXml += '<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="' + self:xml("Valor por filial") + '"/>'
+    cXml += '<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>'
+    cXml += '<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>'
+    cXml += '<a:graphic><a:graphicData uri="' + NS_GRAFICO + '">'
+    cXml += '<c:chart xmlns:c="' + NS_GRAFICO + '" xmlns:r="' + self:namespaceRelacoes() + '" r:id="rId1"/>'
+    cXml += '</a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>'
+    cXml += '</xdr:wsDr>'
+
+return cXml
+
+/*/{Protheus.doc} PlanilhaSintetica::grafico
+Parte xl/charts/chart1.xml: pizza da serie Valor por referencia as celulas das filiais, com o % em cada fatia.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param nFiliais, numeric, linhas de filial na tabela (o total fica fora da serie)
+@return character, XML da parte
+/*/
+method grafico(nFiliais as numeric) as character class PlanilhaSintetica
+
+    Local nCabecalho := self:linhaCabecalho()
+    Local cXml       := '<c:chartSpace xmlns:c="' + NS_GRAFICO + '" xmlns:a="' + NS_DESENHO + '" xmlns:r="' + self:namespaceRelacoes() + '">'
+
+    cXml += '<c:chart>'
+    cXml += '<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>' + self:xml("Valor por filial") + '</a:t></a:r></a:p></c:rich></c:tx>'
+    cXml += '<c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>'
+    cXml += '<c:plotArea><c:layout/><c:pieChart><c:varyColors val="1"/>'
+    cXml += '<c:ser><c:idx val="0"/><c:order val="0"/>'
+    cXml += '<c:tx><c:strRef><c:f>' + self:intervalo("C", nCabecalho, nCabecalho) + '</c:f></c:strRef></c:tx>'
+    cXml += '<c:dLbls><c:numFmt formatCode="0.00%" sourceLinked="0"/><c:showLegendKey val="0"/><c:showVal val="0"/>'
+    cXml += '<c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="1"/><c:showBubbleSize val="0"/>'
+    cXml += '<c:showLeaderLines val="1"/></c:dLbls>'
+    cXml += '<c:cat><c:strRef><c:f>' + self:intervalo("A", nCabecalho + 1, nCabecalho + nFiliais) + '</c:f></c:strRef></c:cat>'
+    cXml += '<c:val><c:numRef><c:f>' + self:intervalo("C", nCabecalho + 1, nCabecalho + nFiliais) + '</c:f></c:numRef></c:val>'
+    cXml += '</c:ser><c:firstSliceAng val="0"/></c:pieChart></c:plotArea>'
+    cXml += '<c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/>'
+    cXml += '</c:chart></c:chartSpace>'
+
+return cXml
+
+/*/{Protheus.doc} PlanilhaSintetica::intervalo
+Referencia absoluta a um trecho de coluna da aba, escapada para o XML.
+@type method
+@author Rubens Simi
+@since 30/10/2026
+@param cColuna, character, letra da coluna
+@param nPrimeira, numeric, primeira linha
+@param nUltima, numeric, ultima linha
+@return character, formula no formato 'Aba'!$C$4:$C$7
+/*/
+method intervalo(cColuna as character, nPrimeira as numeric, nUltima as numeric) as character class PlanilhaSintetica
+
+    Local cFormula := "'" + ABA + "'!$" + cColuna + "$" + cValToChar(nPrimeira)
+
+    If nUltima > nPrimeira
+        cFormula += ":$" + cColuna + "$" + cValToChar(nUltima)
+    EndIf
+
+return self:xml(cFormula)
